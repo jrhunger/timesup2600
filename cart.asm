@@ -19,17 +19,24 @@ StartFrame:
 	sta WSYNC	; 2nd
 	sta WSYNC	; 3rd
 
+;;;; set timer for VBLANK
+	LDA #43
+	STA	TIM64T
+
 	lda #0
 	sta VSYNC	; turn off VSYNC
 
-;;; 37 scanlines of VBLANK
-	ldx #37
-LoopVBlank:
-	sta WSYNC	; wait for next scanline
-	dex	; x--
-	bne LoopVBlank	; repeat until X = 0
+;;;;  start game vblank logic
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	lda #0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;  end game vblank logic
+
+;;;; Wait for rest of VBLANK
+VblankWaitLoop
+	lda INTIM 	; load timer interrupt
+	bne	VblankWaitLoop
+	sta WSYNC 	; wait for next wsync
 	sta VBLANK	; turn off VBlank
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
