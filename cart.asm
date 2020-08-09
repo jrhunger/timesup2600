@@ -11,7 +11,6 @@ Start:
 
 StartFrame:
 	lda #2
-	sta VBLANK
 	sta VSYNC
 
 ;;; 3 lines of VSYNC
@@ -48,18 +47,28 @@ LoopVisible:
 	dex	; x--
 	bne LoopVisible	; go back until x = 0
 
-;;;;;;;;;;;;;;;;;;;;;;;
-;; 30 lines of overscan
+;;;; set timer for OVERSCAN
 	lda #2
-	sta VBLANK	; enable VBLANK
-	
-	ldx #30
+	sta WSYNC
+	sta VBLANK
+	lda #36
+	sta TIM64T
 
-LoopOverscan:
-	sta WSYNC	;wait for next line
-	dex	; x--
-	bne LoopOverscan	; repeat until x = 0
+;;;;  start game overscan logic
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;  end game overscan logic
+
+
+;;;; Wait for rest of OVERSCAN
+OverscanWaitLoop:
+	lda INTIM
+	bne OverscanWaitLoop
+	lda #2
+	sta WSYNC
+
+;;; new frame
 	jmp StartFrame
 
 ;;; Complete to 4kB
