@@ -19,7 +19,7 @@ StartFrame:
 	sta WSYNC	; 3rd
 
 ;;;; set timer for VBLANK
-	LDA #43
+	LDA #44
 	STA	TIM64T
 
 	lda #0
