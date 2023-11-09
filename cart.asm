@@ -21,6 +21,26 @@ P0spriteHi	   byte ; (83) MSB of sprite pointer
 P0reactionTime byte ; (84) P0 reaction budget 
 P0score        byte ; (85) P0 score
 P0bitmap       byte ; (86) P0bitmap (without screen-draw offset)
+LeftScore0     byte ; (87) Score Digits
+LeftScore1     byte ; (87) Score Digits
+LeftScore2     byte ; (87) Score Digits
+LeftScore3     byte ; (87) Score Digits
+LeftScore4     byte ; (87) Score Digits
+LeftScore5     byte ; (87) Score Digits
+RightScore0     byte ; (87) Score Digits
+RightScore1     byte ; (87) Score Digits
+
+; Top Bar digit pointers
+    org $a0
+LeftScorePtr0    word ; (a0/1)
+LeftScorePtr1    word ; (a2/3)
+LeftScorePtr2    word ; (a4/5)
+LeftScorePtr3    word ; (a6/7)
+LeftScorePtr4    word ; (a8/9)
+LeftScorePtr5    word ; (aa/b)
+RightScorePtr0   word ; (ac/d)
+RightScorePtr1   word ; (ae/f)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end variables
 
@@ -42,6 +62,35 @@ Start:
 ;;; Set initial P0bitmap
 	lda #<Ubitmap
 	sta P0bitmap
+
+;;; Set Score Digits
+    lda #$00     ; 0
+	sta LeftScore0
+	sta LeftScore1
+	sta LeftScore2
+	sta LeftScore3
+	sta LeftScore4
+	sta LeftScore5
+	sta RightScore0
+	sta RightScore1
+
+;;; set up Score pointer high bytes
+    lda #>digitTableLeftRev
+	sta LeftScorePtr0+1
+	sta LeftScorePtr4+1
+	sta LeftScorePtr5+1
+	sta RightScorePtr1+1
+    lda #>digitTableLeft
+	sta LeftScorePtr1+1
+    lda #>digitTableRight
+	sta LeftScorePtr2+1
+    lda #>digitTableRightRev
+    sta LeftScorePtr3+1
+    sta RightScorePtr0+1
+
+;;; colors
+    lda #55
+	sta COLUPF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end variable initialization
 
@@ -126,6 +175,9 @@ EndP0Input:
 	sbc #0                 ; subtract 0 (decrements if carry is clear from previous)
 	sta P0spritePtr+1     ; store in high byte of sprite pointer
 
+;;; Setup score pointers for display
+    jsr LoadScorePointers
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end game vblank logic
 
@@ -138,7 +190,34 @@ EndP0Input:
 
 ;;;; kernel (192 visible scan lines)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	ldy #192	; counter
+	ldy #14
+;;; display 14 rows of "score"
+.ScrollLoop
+	sta WSYNC		; 3| 0
+	lda (LeftScorePtr0),Y	; 5| 5 PF0 is single digit
+	sta PF0			; 3| 8
+	lda (LeftScorePtr1),Y	; 4|12
+	ora (LeftScorePtr2),Y	; 5|17
+	sta PF1			; 3|20
+	lda (LeftScorePtr3),Y	; 5|25
+	ora (LeftScorePtr4),Y	; 5|30
+	sta PF2			; 3|33
+	lda (LeftScorePtr5),Y	; 5|38
+	sta PF0			; 3|41
+;; need to redo counts
+;	lda (ScrollPtr6),Y	; 5|46
+;	ora (ScrollPtr7),Y	; 5|51
+	lda #0
+	sta PF1			; 3|54
+	lda (RightScorePtr0),Y	; 5|59
+	ora (RightScorePtr1),Y	; 5|64
+	sta PF2			; 3|67
+	dey			    ; 2|69
+	bne .ScrollLoop		; 3|75/76
+
+;;; one more black line before moving to play area
+	sta WSYNC
+	ldy #177	; counter
 .LoopVisible:
 ;;; for rainbow background
 	sty COLUBK	; set bg color to loop var
@@ -191,6 +270,63 @@ EndP0Input:
 
 ;;;;   start subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Load Score Pointers based on corresponding values
+LoadScorePointers SUBROUTINE
+	lda LeftScore0	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr0	; Put in LSB of ScrollPtr
+
+	lda LeftScore1	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr1	; Put in LSB of ScrollPtr
+
+	lda LeftScore2	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr2	; Put in LSB of ScrollPtr
+
+	lda LeftScore3	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr3	; Put in LSB of ScrollPtr
+
+	lda LeftScore4	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr4	; Put in LSB of ScrollPtr
+
+	lda LeftScore5	; load the digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta LeftScorePtr5	; Put in LSB of ScrollPtr
+
+	lda #%11110000 	; mask for first decimal digit
+	and P0score	;
+	sta RightScorePtr0	; Put in LSB of ScorePtr
+
+	lda #%00001111	; load the digit
+	and P0score	; load 2nd decimal digit
+	asl		; 
+	asl		; 
+	asl		; 
+	asl		; multiply by 16
+	sta RightScorePtr1	; Put in LSB of ScorePtr
+
+	rts
 
 ;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
 ; Positions an object horizontally
@@ -223,6 +359,27 @@ PosObject SUBROUTINE
 ;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
 ;;; (see link for alternate way without lookup table)
 	
+;;; fine adjustment for PosObject
+;;; some explanation on "negative index" is here: 
+;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
+
+fineAdjustBegin
+	DC.B %01110000; Left 7 
+	DC.B %01100000; Left 6
+	DC.B %01010000; Left 5
+	DC.B %01000000; Left 4
+	DC.B %00110000; Left 3
+	DC.B %00100000; Left 2
+	DC.B %00010000; Left 1
+	DC.B %00000000; No movement.
+	DC.B %11110000; Right 1
+	DC.B %11100000; Right 2
+	DC.B %11010000; Right 3
+	DC.B %11000000; Right 4
+	DC.B %10110000; Right 5
+	DC.B %10100000; Right 6
+	DC.B %10010000; Right 7
+fineAdjustTable EQU fineAdjustBegin - %11110001 ; NOTE: %11110001 = -15
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;   end subroutines
@@ -316,30 +473,15 @@ P0Index:
 	byte #<NullBitmap
 	byte #<Xbitmap
 
+;;; digits.h should set digitTable at the beginning followed by
+;;;          an array of 16 bytes for each digit 0-9
+	include "digitTableRight.h"
+	include "digitTableLeft.h"
+	include "digitTableRightRev.h"
+	include "digitTableLeftRev.h"
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end ROM lookup tables
-
-;;; fine adjustment for PosObject
-;;; some explanation on "negative index" is here: 
-;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
-
-fineAdjustBegin
-	DC.B %01110000; Left 7 
-	DC.B %01100000; Left 6
-	DC.B %01010000; Left 5
-	DC.B %01000000; Left 4
-	DC.B %00110000; Left 3
-	DC.B %00100000; Left 2
-	DC.B %00010000; Left 1
-	DC.B %00000000; No movement.
-	DC.B %11110000; Right 1
-	DC.B %11100000; Right 2
-	DC.B %11010000; Right 3
-	DC.B %11000000; Right 4
-	DC.B %10110000; Right 5
-	DC.B %10100000; Right 6
-	DC.B %10010000; Right 7
-fineAdjustTable EQU fineAdjustBegin - %11110001 ; NOTE: %11110001 = -15
 
 ;;; Complete to 4kB
 	org $FFFC

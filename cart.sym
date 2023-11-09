@@ -1,28 +1,29 @@
 --- Symbol List (sorted by symbol)
-0.DrawP0                 f09e              (R )
+0.DrawP0                 f0f6              (R )
 0.FREE_BYTES             0000                  
-0.LoopVisible            f08f              (R )
-0.NoDrawP0               f0a2              (R )
-0.OverscanWaitLoop       f0b2              (R )
-0.VblankWaitLoop         f084              (R )
+0.LoopVisible            f0e7              (R )
+0.NoDrawP0               f0fa              (R )
+0.OverscanWaitLoop       f10a              (R )
+0.ScrollLoop             f0c0              (R )
+0.VblankWaitLoop         f0b5              (R )
 1.CLEAR_STACK            f006              (R )
-2.divideby15             f0c1              (R )
+3.divideby15             f15a              (R )
 AUDC0                    0015                  
 AUDC1                    0016                  
 AUDF0                    0017                  
 AUDF1                    0018                  
 AUDV0                    0019                  
 AUDV1                    001a                  
-BitmapTable              f100              (R )
-CheckInputCorrect        f058                  
-CheckP0Down              f03d              (R )
-CheckP0Left              f04f              (R )
-CheckP0Right             f046              (R )
-CheckP0Up                f034                  
+BitmapTable              f200              (R )
+CheckInputCorrect        f086                  
+CheckP0Down              f06b              (R )
+CheckP0Left              f07d              (R )
+CheckP0Right             f074              (R )
+CheckP0Up                f062                  
 COLUBK                   0009              (R )
 COLUP0                   0006                  
 COLUP1                   0007                  
-COLUPF                   0008                  
+COLUPF                   0008              (R )
 CTRLPF                   000a                  
 CXBLPF                   0006                  
 CXCLR                    002c                  
@@ -33,14 +34,18 @@ CXM1P                    0001
 CXP0FB                   0002                  
 CXP1FB                   0003                  
 CXPPMM                   0007                  
-Dbitmap                  f112              (R )
+Dbitmap                  f212              (R )
+digitTableLeft           f400              (R )
+digitTableLeftRev        f600              (R )
+digitTableRight          f300              (R )
+digitTableRightRev       f500              (R )
 ENABL                    001f                  
 ENAM0                    001d                  
 ENAM1                    001e                  
-EndP0Input               f06d              (R )
-EndP0InputCheck          f058              (R )
-fineAdjustBegin          f145              (R )
-fineAdjustTable          f054                  
+EndP0Input               f09b              (R )
+EndP0InputCheck          f086              (R )
+fineAdjustBegin          f169              (R )
+fineAdjustTable          f078                  
 GRP0                     001b              (R )
 GRP1                     001c                  
 HMBL                     0024                  
@@ -57,27 +62,40 @@ INPT3                    000b
 INPT4                    000c                  
 INPT5                    000d                  
 INTIM                    0284              (R )
-Lbitmap                  f100              (R )
-NullBitmap               f12d              (R )
+Lbitmap                  f200              (R )
+LeftScore0               0087              (R )
+LeftScore1               0088              (R )
+LeftScore2               0089              (R )
+LeftScore3               008a              (R )
+LeftScore4               008b              (R )
+LeftScore5               008c              (R )
+LeftScorePtr0            00a0              (R )
+LeftScorePtr1            00a2              (R )
+LeftScorePtr2            00a4              (R )
+LeftScorePtr3            00a6              (R )
+LeftScorePtr4            00a8              (R )
+LeftScorePtr5            00aa              (R )
+LoadScorePointers        f116              (R )
+NullBitmap               f22d              (R )
 NUSIZ0                   0004                  
 NUSIZ1                   0005                  
 P0bitmap                 0086              (R )
-P0color                  f136                  
-P0Correct                f060                  
+P0color                  f236                  
+P0Correct                f08e                  
 P0HEIGHT                 0009              (R )
-P0Incorrect              f069              (R )
-P0Index                  f13f                  
+P0Incorrect              f097              (R )
+P0Index                  f23f                  
 P0reactionTime           0084              (R )
 P0score                  0085              (R )
 P0spriteHi               0083              (R )
 P0spritePtr              0082              (R )
 P0x                      0080              (R )
 P0y                      0081              (R )
-PF0                      000d                  
-PF1                      000e                  
-PF2                      000f                  
-PosObject                f0be              (R )
-Rbitmap                  f109              (R )
+PF0                      000d              (R )
+PF1                      000e              (R )
+PF2                      000f              (R )
+PosObject                f157              (R )
+Rbitmap                  f209              (R )
 REFP0                    000b                  
 REFP1                    000c                  
 RESBL                    0014                  
@@ -87,9 +105,13 @@ RESMP0                   0028
 RESMP1                   0029                  
 RESP0                    0010              (R )
 RESP1                    0011                  
+RightScore0              008d              (R )
+RightScore1              008e              (R )
+RightScorePtr0           00ac              (R )
+RightScorePtr1           00ae              (R )
 RSYNC                    0003                  
 Start                    f000              (R )
-StartFrame               f019              (R )
+StartFrame               f047              (R )
 SWACNT                   0281                  
 SWBCNT                   0283                  
 SWCHA                    0280              (R )
@@ -102,7 +124,7 @@ TIM1T                    0294
 TIM64T                   0296              (R )
 TIM8T                    0295                  
 TIMINT                   0285                  
-Ubitmap                  f11b              (R )
+Ubitmap                  f21b              (R )
 VBLANK                   0001              (R )
 VDELBL                   0027                  
 VDELP0                   0025                  
@@ -111,5 +133,5 @@ VERSION_MACRO            006b
 VERSION_VCS              0069                  
 VSYNC                    0000              (R )
 WSYNC                    0002              (R )
-Xbitmap                  f124              (R )
+Xbitmap                  f224              (R )
 --- End of Symbol List.
