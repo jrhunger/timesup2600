@@ -130,12 +130,17 @@ StartFrame:
     lda Active
 	bne ConsumeTime
 ;;; not active so check if time to activate
-    dec DelayTime
+    lda DelayTime
+	beq NoNewBitmap  ; already zero
+	sec
+	sbc #1
+	sta DelayTime
 	bne NoNewBitmap
 NewBitmap
-    jsr Random    ; get a random #
-	and #00000011 ; truncate to 2 bits
-    tay           ; put in Y
+    jsr Random     ; get a random #
+	and #%00000011 ; truncate to 2 bits
+    tay            ; put in Y
+	clc
 	lda BitmapIndex,Y
 	sta P0bitmap
 	; set Active
@@ -163,6 +168,8 @@ ConsumeTime
 	sta Active
 	lda #<TimeBitmap
 	sta P0bitmap
+	lda #0
+	sta Active
 	jmp EndP0Input
 
 ;;; check input signals
@@ -216,7 +223,8 @@ P0Incorrect:
 SetDelay:
 	; set a random delay
 	jsr Random
-	and #%00001111     ; 0-15
+	and #%00111111     ; max 127 (around 2.5 second)
+	ora #%00100000     ; min 31 (a little more than 1/2 second)
 	sta DelayTime
 ;;; end of input processing	
 EndP0Input:
@@ -228,7 +236,7 @@ EndP0Input:
 ;;; P0 vertical position
     lda P0bitmap           ; bitmap base
 	clc                    ; clear carry for add
-	adc #P0HEIGHT-1        ; bitmap high end
+	adc #P0HEIGHT          ; bitmap high end
 	sec                    ; set carry for subtract
 	sbc P0y                ; offset by P0y for draw logic
 	sta P0spritePtr        ; store in sprite pointer
@@ -361,19 +369,18 @@ LoadScorePointers SUBROUTINE
 	asl		; multiply by 16
 	sta LeftScorePtr3	; store in pointer
 
-	lda LeftScore4	; load the digit
+	lda #%00001111	    ; mask for 2nd decimal digit
+	and LeftScore4	    ; load the digit
 	asl		; 
 	asl		; 
 	asl		; 
 	asl		; multiply by 16
 	sta LeftScorePtr4	; Put in LSB of ScrollPtr
 
-	lda LeftScore5	; load the digit
-	asl		; 
-	asl		; 
-	asl		; 
-	asl		; multiply by 16
-	sta LeftScorePtr5	; Put in LSB of ScrollPtr
+    ; delay time countdown (MSB only)
+	lda #%11110000 	    ; mask for first decimal digit
+	and DelayTime	    ; load the digit
+	sta LeftScorePtr5	; store as is (already x16)
 
     ; score digits
 	lda #%11110000 	    ; mask for first decimal digit
