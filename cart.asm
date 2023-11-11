@@ -128,8 +128,16 @@ StartFrame:
 
 ;;; check if active
     lda Active
-	bne ConsumeTime
+	beq NotActive
+	jsr ConsumeTime
+	jmp CheckInput
 ;;; not active so check if time to activate
+NotActive
+    lda P0bitmap
+	cmp #<Xbitmap
+    bne NotX
+	jsr ConsumeTime
+NotX
     lda DelayTime
 	beq NoNewBitmap  ; already zero
 	sec
@@ -148,29 +156,6 @@ NewBitmap
 	sta Active
 NoNewBitmap
     jmp EndP0Input
-	
-;;; sprite is active, consume time (decimal)
-ConsumeTime
-	sed
-    sec
-    lda P0time0
-	sbc #1
-	sta P0time0
-    lda P0time1
-	sbc #0
-	sta P0time1
-	cld
-	bcs CheckInput  ; time's not up
-	; time's up, set back to 0
-	lda #0
-	sta P0time0
-	sta P0time1
-	sta Active
-	lda #<TimeBitmap
-	sta P0bitmap
-	lda #0
-	sta Active
-	jmp EndP0Input
 
 ;;; check input signals
 CheckInput
@@ -342,6 +327,29 @@ EndP0Input:
 ;;;;   start subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Load Score Pointers based on corresponding values
+
+ConsumeTime SUBROUTINE
+	sed
+    sec
+    lda P0time0
+	sbc #1
+	sta P0time0
+    lda P0time1
+	sbc #0
+	sta P0time1
+	cld
+	bcc TimesUp
+	rts
+TimesUp:
+	; time's up, set back to 0 and deactive countdown
+	lda #0
+	sta P0time0
+	sta P0time1
+	sta Active
+	lda #<TimeBitmap
+	sta P0bitmap
+	rts
+
 LoadScorePointers SUBROUTINE
     ; first byte (two digits) of timer
 	lda #%11110000 	    ; mask for first decimal digit
