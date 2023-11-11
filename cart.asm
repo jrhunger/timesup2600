@@ -14,21 +14,19 @@ P0HEIGHT equ 9
 	org $80
 ;;;;  start variable declarations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-P0x	           byte ; (80) P0 x
-P0y	           byte ; (81) P0 y
-P0spritePtr	   byte ; (82) y-adjusted sprite pointer
-P0spriteHi	   byte ; (83) MSB of sprite pointer
-P0reactionTime byte ; (84) P0 reaction budget 
-P0score        byte ; (85) P0 score
-P0bitmap       byte ; (86) P0bitmap (without screen-draw offset)
-LeftScore0     byte ; (87) Score Digits
-LeftScore1     byte ; (87) Score Digits
-LeftScore2     byte ; (87) Score Digits
-LeftScore3     byte ; (87) Score Digits
-LeftScore4     byte ; (87) Score Digits
-LeftScore5     byte ; (87) Score Digits
-RightScore0     byte ; (87) Score Digits
-RightScore1     byte ; (87) Score Digits
+P0x	         byte ; (80) P0 x
+P0y	         byte ; (81) P0 y
+P0spritePtr  byte ; (82) y-adjusted sprite pointer
+P0spriteHi	 byte ; (83) MSB of sprite pointer
+P0time0      byte ; (84) P0 reaction budget 
+P0time1      byte ; (85) P0 reaction budget 
+P0score      byte ; (86) P0 score
+P0bitmap     byte ; (87) P0bitmap (without screen-draw offset)
+LeftScore4   byte ; (88) Score Digits
+LeftScore5   byte ; (89) Score Digits
+Active       byte ; (8a) Whether to count time
+DelayTime    byte ; (8a) Whether to count time
+Rand8        byte ; (8b) 8-bit random
 
 ; Top Bar digit pointers
     org $a0
@@ -53,26 +51,35 @@ Start:
 
 ;;;;  start variable initialization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	lda #50
-	sta P0x
+;;; initialize Random seed
+    lda INTIM    ; unknown from timer
+	ora $1       ; can't be zero
+	sta Rand8
+;;; player coordinates	
+	lda #88
 	sta P0y
+	lda #70
+	sta P0x
 ;;; Set high byte of P0spritePtr (low byte updated per frame)
 	lda #>BitmapTable
 	sta P0spriteHi
 ;;; Set initial P0bitmap
 	lda #<Ubitmap
 	sta P0bitmap
+;;; set timer to 999 (decimal)
+    lda #153     ; hex 99
+	sta P0time0
+	lda #9
+	sta P0time1
+
+;;; start with time active
+    lda #1
+	sta Active
 
 ;;; Set Score Digits
-    lda #$00     ; 0
-	sta LeftScore0
-	sta LeftScore1
-	sta LeftScore2
-	sta LeftScore3
+    lda #$0a     ; blank
 	sta LeftScore4
 	sta LeftScore5
-	sta RightScore0
-	sta RightScore1
 
 ;;; set up Score pointer high bytes
     lda #>digitTableLeftRev
@@ -88,9 +95,15 @@ Start:
     sta LeftScorePtr3+1
     sta RightScorePtr0+1
 
-;;; colors
+;;; register setup
+    ; playfield color
     lda #55
 	sta COLUPF
+	; player/missile size register
+	;lda %00000000    ; one player, single-sized
+	lda %00000101    ; one player, double-sized
+	;lda %00000111    ; one player, quad-sized
+	sta NUSIZ0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end variable initialization
 
@@ -113,14 +126,48 @@ StartFrame:
 ;;;;  start game vblank logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; skip input detection if sprite is null
-    ldx #<NullBitmap
-	cpx P0bitmap
-	beq EndP0Input
-;;; sprite is active, consume time (?? maybe move lower)
-    dec P0reactionTime
+;;; check if active
+    lda Active
+	bne ConsumeTime
+;;; not active so check if time to activate
+    dec DelayTime
+	bne NoNewBitmap
+NewBitmap
+    jsr Random    ; get a random #
+	and #00000011 ; truncate to 2 bits
+    tay           ; put in Y
+	lda BitmapIndex,Y
+	sta P0bitmap
+	; set Active
+	lda #1
+	sta Active
+NoNewBitmap
+    jmp EndP0Input
+	
+;;; sprite is active, consume time (decimal)
+ConsumeTime
+	sed
+    sec
+    lda P0time0
+	sbc #1
+	sta P0time0
+    lda P0time1
+	sbc #0
+	sta P0time1
+	cld
+	bcs CheckInput  ; time's not up
+	; time's up, set back to 0
+	lda #0
+	sta P0time0
+	sta P0time1
+	sta Active
+	lda #<TimeBitmap
+	sta P0bitmap
+	jmp EndP0Input
 
 ;;; check input signals
+CheckInput
+    ldx #<NullBitmap
 CheckP0Up:
 	lda #%00010000
 	bit SWCHA
@@ -147,16 +194,30 @@ EndP0InputCheck:
 CheckInputCorrect:
     cpx #<NullBitmap   ; if x hasn't changed
 	beq EndP0Input	   ; we didn't get input
-	cpx P0bitmap    ; check if input matches icon
+	lda #0             ; if we did get input
+	sta Active         ; stop time counter
+	cpx P0bitmap       ; check if input matches icon
 	bne P0Incorrect
 P0Correct:
-    inc P0score        ; score 1
-	lda #<NullBitmap   ; set bitmap to null
+	; increment (decimal) score
+    clc
+    lda P0score
+	sed
+	adc #1
+	sta P0score
+	cld
+    ; set bitmap to null
+	lda #<NullBitmap
 	sta P0bitmap
-    jmp EndP0Input
+    jmp SetDelay
 P0Incorrect:
 	lda #<Xbitmap      ; set bitmap to X
 	sta P0bitmap
+SetDelay:
+	; set a random delay
+	jsr Random
+	and #%00001111     ; 0-15
+	sta DelayTime
 ;;; end of input processing	
 EndP0Input:
 
@@ -253,6 +314,8 @@ EndP0Input:
 
 ;;;;  start game overscan logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; cycle the Random a tick
+    jsr Random
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end game overscan logic
@@ -272,33 +335,31 @@ EndP0Input:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Load Score Pointers based on corresponding values
 LoadScorePointers SUBROUTINE
-	lda LeftScore0	; load the digit
-	asl		; 
-	asl		; 
-	asl		; 
-	asl		; multiply by 16
-	sta LeftScorePtr0	; Put in LSB of ScrollPtr
+    ; first byte (two digits) of timer
+	lda #%11110000 	    ; mask for first decimal digit
+	and P0time1  ;
+	sta LeftScorePtr0	; store as is (already x16)
 
-	lda LeftScore1	; load the digit
+	lda #%00001111	    ; mask for 2nd decimal digit
+	and P0time1  ; 
 	asl		; 
 	asl		; 
 	asl		; 
 	asl		; multiply by 16
-	sta LeftScorePtr1	; Put in LSB of ScrollPtr
+	sta LeftScorePtr1	; store in pointer
 
-	lda LeftScore2	; load the digit
-	asl		; 
-	asl		; 
-	asl		; 
-	asl		; multiply by 16
-	sta LeftScorePtr2	; Put in LSB of ScrollPtr
+    ; second byte (two digits) of timer
+	lda #%11110000 	    ; mask for first decimal digit
+	and P0time0  ;
+	sta LeftScorePtr2	; store as is (already x16)
 
-	lda LeftScore3	; load the digit
+	lda #%00001111	    ; mask for 2nd decimal digit
+	and P0time0  ; 
 	asl		; 
 	asl		; 
 	asl		; 
 	asl		; multiply by 16
-	sta LeftScorePtr3	; Put in LSB of ScrollPtr
+	sta LeftScorePtr3	; store in pointer
 
 	lda LeftScore4	; load the digit
 	asl		; 
@@ -314,17 +375,18 @@ LoadScorePointers SUBROUTINE
 	asl		; multiply by 16
 	sta LeftScorePtr5	; Put in LSB of ScrollPtr
 
-	lda #%11110000 	; mask for first decimal digit
-	and P0score	;
-	sta RightScorePtr0	; Put in LSB of ScorePtr
+    ; score digits
+	lda #%11110000 	    ; mask for first decimal digit
+	and P0score	        ;
+	sta RightScorePtr0	; store as is (already x16)
 
-	lda #%00001111	; load the digit
-	and P0score	; load 2nd decimal digit
+	lda #%00001111	    ; mask for 2nd decimal digit
+	and P0score	        ; 
 	asl		; 
 	asl		; 
 	asl		; 
 	asl		; multiply by 16
-	sta RightScorePtr1	; Put in LSB of ScorePtr
+	sta RightScorePtr1	; store in pointer
 
 	rts
 
@@ -381,12 +443,28 @@ fineAdjustBegin
 	DC.B %10010000; Right 7
 fineAdjustTable EQU fineAdjustBegin - %11110001 ; NOTE: %11110001 = -15
 
+;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
+Random:
+    lda Rand8
+    lsr
+	bcc noeor
+	eor #$B4
+noeor:
+    sta Rand8
+	rts
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;   end subroutines
 
 ;;;;  start ROM lookup tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     align 256
+BitmapIndex:
+    byte #<Lbitmap
+    byte #<Rbitmap
+    byte #<Ubitmap
+    byte #<Dbitmap
+
 BitmapTable:
 Lbitmap:
 	byte #%00000000
@@ -452,6 +530,17 @@ NullBitmap:
 	byte #%00000000
 	byte #%00000000
 	byte #%00000000
+	byte #%00000000
+
+TimeBitmap:
+	byte #%00000000
+	byte #%11111111
+	byte #%01011010
+	byte #%00100100
+	byte #%00011000
+	byte #%00111100
+	byte #%01000010
+	byte #%11111111
 	byte #%00000000
 
 P0color:
