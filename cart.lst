@@ -392,8 +392,8 @@
      24 U0087		       00	   P0bitmap   byte.b		; (87) P0bitmap (without screen-draw offset)
      25 U0088		       00	   LeftScore4 byte.b		; (88) Score Digits
      26 U0089		       00	   LeftScore5 byte.b		; (89) Score Digits
-     27 U008a		       00	   Active     byte.b		; (8a) Whether to count time
-     28 U008b		       00	   DelayTime  byte.b		; (8a) Whether to count time
+     27 U008a		       00	   Active     byte.b		; (8a) bit 0 = count time, bit 1 = check input
+     28 U008b		       00	   DelayTime  byte.b		; (8a) Time left in delay
      29 U008c		       00	   Rand8      byte.b		; (8b) 8-bit random
      30 U008d
      31 U008d							; Top Bar digit pointers
@@ -434,928 +434,736 @@
      55  f00b		       ad 84 02 	      lda	INTIM	; unknown from timer
      56  f00e		       05 01		      ora	$1	; can't be zero
      57  f010		       85 8c		      sta	Rand8
-     58  f012							;;; player coordinates
-     59  f012		       a9 58		      lda	#88
-     60  f014		       85 81		      sta	P0y
-     61  f016		       a9 46		      lda	#70
-     62  f018		       85 80		      sta	P0x
-     63  f01a							;;; Set high byte of P0spritePtr (low byte updated per frame)
-     64  f01a		       a9 f2		      lda	#>BitmapTable
-     65  f01c		       85 83		      sta	P0spriteHi
-     66  f01e							;;; Set initial P0bitmap
-     67  f01e		       a9 1f		      lda	#<Ubitmap
-     68  f020		       85 87		      sta	P0bitmap
-     69  f022							;;; set timer to 999 (decimal)
-     70  f022		       a9 99		      lda	#153	; hex 99
-     71  f024		       85 84		      sta	P0time0
-     72  f026		       a9 09		      lda	#9
-     73  f028		       85 85		      sta	P0time1
-     74  f02a
-     75  f02a							;;; start with time active
-     76  f02a		       a9 01		      lda	#1
-     77  f02c		       85 8a		      sta	Active
-     78  f02e
-     79  f02e							;;; Set Score Digits
-     80  f02e		       a9 0a		      lda	#$0a	; blank
-     81  f030		       85 88		      sta	LeftScore4
-     82  f032		       85 89		      sta	LeftScore5
-     83  f034
-     84  f034							;;; set up Score pointer high bytes
-     85  f034		       a9 f6		      lda	#>digitTableLeftRev
-     86  f036		       85 a1		      sta	LeftScorePtr0+1
-     87  f038		       85 a9		      sta	LeftScorePtr4+1
-     88  f03a		       85 ab		      sta	LeftScorePtr5+1
-     89  f03c		       85 af		      sta	RightScorePtr1+1
-     90  f03e		       a9 f4		      lda	#>digitTableLeft
-     91  f040		       85 a3		      sta	LeftScorePtr1+1
-     92  f042		       a9 f3		      lda	#>digitTableRight
-     93  f044		       85 a5		      sta	LeftScorePtr2+1
-     94  f046		       a9 f5		      lda	#>digitTableRightRev
-     95  f048		       85 a7		      sta	LeftScorePtr3+1
-     96  f04a		       85 ad		      sta	RightScorePtr0+1
-     97  f04c
-     98  f04c							;;; register setup
-     99  f04c							; playfield color
-    100  f04c		       a9 37		      lda	#55
-    101  f04e		       85 08		      sta	COLUPF
-    102  f050							; player/missile size register
-    103  f050							;lda %00000000    ; one player, single-sized
-    104  f050		       a5 05		      lda	%00000101	; one player, double-sized
-    105  f052							;lda %00000111    ; one player, quad-sized
-    106  f052		       85 04		      sta	NUSIZ0
-    107  f054							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    108  f054							;;;;  end variable initialization
-    109  f054
-    110  f054				   StartFrame
-    111  f054		       a9 02		      lda	#2
-    112  f056		       85 00		      sta	VSYNC
-    113  f058
-    114  f058							;;; 3 lines of VSYNC
-    115  f058		       85 02		      sta	WSYNC	; store halts until scanline complete
-    116  f05a		       85 02		      sta	WSYNC	; 2nd
-    117  f05c		       85 02		      sta	WSYNC	; 3rd
-    118  f05e
-    119  f05e							;;;; set timer for VBLANK
-    120  f05e		       a9 2c		      LDA	#44
-    121  f060		       8d 96 02 	      STA	TIM64T
-    122  f063
-    123  f063		       a9 00		      lda	#0
-    124  f065		       85 00		      sta	VSYNC	; turn off VSYNC
-    125  f067
-    126  f067							;;;;  start game vblank logic
-    127  f067							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    128  f067
-    129  f067							;;; check if active
-    130  f067		       a5 8a		      lda	Active
-    131  f069		       f0 06		      beq	NotActive
-    132  f06b		       20 65 f1 	      jsr	ConsumeTime
-    133  f06e		       4c 98 f0 	      jmp	CheckInput
-    134  f071							;;; not active so check if time to activate
-    135  f071				   NotActive
-    136  f071		       a5 87		      lda	P0bitmap
-    137  f073		       c9 28		      cmp	#<Xbitmap
-    138  f075		       d0 03		      bne	NotX
-    139  f077		       20 65 f1 	      jsr	ConsumeTime
-    140  f07a				   NotX
-    141  f07a		       a5 8b		      lda	DelayTime
-    142  f07c		       f0 17		      beq	NoNewBitmap	; already zero
-    143  f07e		       38		      sec
-    144  f07f		       e9 01		      sbc	#1
-    145  f081		       85 8b		      sta	DelayTime
-    146  f083		       d0 10		      bne	NoNewBitmap
-    147  f085				   NewBitmap
-    148  f085		       20 e6 f1 	      jsr	Random	; get a random #
-    149  f088		       29 03		      and	#%00000011	; truncate to 2 bits
-    150  f08a		       a8		      tay		; put in Y
-    151  f08b		       18		      clc
-    152  f08c		       b9 00 f2 	      lda	BitmapIndex,Y
-    153  f08f		       85 87		      sta	P0bitmap
-    154  f091							; set Active
-    155  f091		       a9 01		      lda	#1
-    156  f093		       85 8a		      sta	Active
-    157  f095				   NoNewBitmap
-    158  f095		       4c e7 f0 	      jmp	EndP0Input
-    159  f098
-    160  f098							;;; check input signals
-    161  f098				   CheckInput
-    162  f098		       a2 31		      ldx	#<NullBitmap
-    163  f09a				   CheckP0Up
-    164  f09a		       a9 10		      lda	#%00010000
-    165  f09c		       2c 80 02 	      bit	SWCHA
-    166  f09f		       d0 02		      bne	CheckP0Down
-    167  f0a1		       a2 1f		      ldx	#<Ubitmap
-    168  f0a3				   CheckP0Down
-    169  f0a3		       a9 20		      lda	#%00100000
-    170  f0a5		       2c 80 02 	      bit	SWCHA
-    171  f0a8		       d0 02		      bne	CheckP0Right
-    172  f0aa		       a2 16		      ldx	#<Dbitmap
-    173  f0ac				   CheckP0Right
-    174  f0ac		       a9 80		      lda	#%10000000
-    175  f0ae		       2c 80 02 	      bit	SWCHA
-    176  f0b1		       d0 02		      bne	CheckP0Left
-    177  f0b3		       a2 0d		      ldx	#<Rbitmap
-    178  f0b5				   CheckP0Left
-    179  f0b5		       a9 40		      lda	#%01000000
-    180  f0b7		       2c 80 02 	      bit	SWCHA
-    181  f0ba		       d0 02		      bne	EndP0InputCheck
-    182  f0bc		       a2 04		      ldx	#<Lbitmap
-    183  f0be				   EndP0InputCheck
-    184  f0be
-    185  f0be							;;; do input-related processing
-    186  f0be				   CheckInputCorrect
-    187  f0be		       e0 31		      cpx	#<NullBitmap	; if x hasn't changed
-    188  f0c0		       f0 25		      beq	EndP0Input	; we didn't get input
-    189  f0c2		       a9 00		      lda	#0	; if we did get input
-    190  f0c4		       85 8a		      sta	Active	; stop time counter
-    191  f0c6		       e4 87		      cpx	P0bitmap	; check if input matches icon
-    192  f0c8		       d0 10		      bne	P0Incorrect
-    193  f0ca				   P0Correct
-    194  f0ca							; increment (decimal) score
-    195  f0ca		       18		      clc
-    196  f0cb		       a5 86		      lda	P0score
-    197  f0cd		       f8		      sed
-    198  f0ce		       69 01		      adc	#1
-    199  f0d0		       85 86		      sta	P0score
-    200  f0d2		       d8		      cld
-    201  f0d3							; set bitmap to null
-    202  f0d3		       a9 31		      lda	#<NullBitmap
-    203  f0d5		       85 87		      sta	P0bitmap
-    204  f0d7		       4c de f0 	      jmp	SetDelay
-    205  f0da				   P0Incorrect
-    206  f0da		       a9 28		      lda	#<Xbitmap	; set bitmap to X
-    207  f0dc		       85 87		      sta	P0bitmap
-    208  f0de				   SetDelay
-    209  f0de							; set a random delay
-    210  f0de		       20 e6 f1 	      jsr	Random
-    211  f0e1		       29 3f		      and	#%00111111	; max 127 (around 2.5 second)
-    212  f0e3		       09 20		      ora	#%00100000	; min 31 (a little more than 1/2 second)
-    213  f0e5		       85 8b		      sta	DelayTime
-    214  f0e7							;;; end of input processing
-    215  f0e7				   EndP0Input
-    216  f0e7
-    217  f0e7							;;; P0 horizontal position
-    218  f0e7		       a2 00		      ldx	#0
-    219  f0e9		       a5 80		      lda	P0x
-    220  f0eb		       20 c5 f1 	      jsr	PosObject
-    221  f0ee							;;; P0 vertical position
-    222  f0ee		       a5 87		      lda	P0bitmap	; bitmap base
-    223  f0f0		       18		      clc		; clear carry for add
-    224  f0f1		       69 09		      adc	#P0HEIGHT	; bitmap high end
-    225  f0f3		       38		      sec		; set carry for subtract
-    226  f0f4		       e5 81		      sbc	P0y	; offset by P0y for draw logic
-    227  f0f6		       85 82		      sta	P0spritePtr	; store in sprite pointer
-    228  f0f8		       a9 f2		      lda	#>BitmapTable	; load 2nd byte of bitmap table
-    229  f0fa		       e9 00		      sbc	#0	; subtract 0 (decrements if carry is clear from previous)
-    230  f0fc		       85 83		      sta	P0spritePtr+1	; store in high byte of sprite pointer
-    231  f0fe
-    232  f0fe							;;; Setup score pointers for display
-    233  f0fe		       20 84 f1 	      jsr	LoadScorePointers
-    234  f101
-    235  f101							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    236  f101							;;;;  end game vblank logic
-    237  f101
-    238  f101							;;;; Wait for rest of VBLANK
-    239  f101				   .VblankWaitLoop
-    240  f101		       ad 84 02 	      lda	INTIM	; load timer interrupt
-    241  f104		       d0 fb		      bne	.VblankWaitLoop
-    242  f106		       85 02		      sta	WSYNC	; wait for next wsync
-    243  f108		       85 01		      sta	VBLANK	; turn off VBlank
-    244  f10a
-    245  f10a							;;;; kernel (192 visible scan lines)
-    246  f10a							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    247  f10a		       a0 0e		      ldy	#14
-    248  f10c							;;; display 14 rows of "score"
-    249  f10c				   .ScrollLoop
-    250  f10c		       85 02		      sta	WSYNC	; 3| 0
-    251  f10e		       b1 a0		      lda	(LeftScorePtr0),Y	; 5| 5 PF0 is single digit
-    252  f110		       85 0d		      sta	PF0	; 3| 8
-    253  f112		       b1 a2		      lda	(LeftScorePtr1),Y	; 4|12
-    254  f114		       11 a4		      ora	(LeftScorePtr2),Y	; 5|17
-    255  f116		       85 0e		      sta	PF1	; 3|20
-    256  f118		       b1 a6		      lda	(LeftScorePtr3),Y	; 5|25
-    257  f11a		       11 a8		      ora	(LeftScorePtr4),Y	; 5|30
-    258  f11c		       85 0f		      sta	PF2	; 3|33
-    259  f11e		       b1 aa		      lda	(LeftScorePtr5),Y	; 5|38
-    260  f120		       85 0d		      sta	PF0	; 3|41
-    261  f122							;; need to redo counts
-    262  f122							;	lda (ScrollPtr6),Y	; 5|46
-    263  f122							;	ora (ScrollPtr7),Y	; 5|51
-    264  f122		       a9 00		      lda	#0
-    265  f124		       85 0e		      sta	PF1	; 3|54
-    266  f126		       b1 ac		      lda	(RightScorePtr0),Y	; 5|59
-    267  f128		       11 ae		      ora	(RightScorePtr1),Y	; 5|64
-    268  f12a		       85 0f		      sta	PF2	; 3|67
-    269  f12c		       88		      dey		; 2|69
-    270  f12d		       d0 dd		      bne	.ScrollLoop	; 3|75/76
-    271  f12f
-    272  f12f							;;; one more black line before moving to play area
-    273  f12f		       85 02		      sta	WSYNC
-    274  f131		       a0 b1		      ldy	#177	; counter
-    275  f133				   .LoopVisible
-    276  f133							;;; for rainbow background
-    277  f133		       84 09		      sty	COLUBK	; set bg color to loop var
-    278  f135
-    279  f135							;;; draw P0
-    280  f135		       38		      sec		; 2 set carry
-    281  f136		       98		      tya		; 2
-    282  f137		       e5 81		      sbc	P0y	; 3
-    283  f139		       65 09		      adc	P0HEIGHT	; 2
-    284  f13b		       b0 05		      bcs	.DrawP0
-    285  f13d
-    286  f13d		       ea		      nop		; 2
-    287  f13e		       ea		      nop		; 2
-    288  f13f		       38		      sec		; 2
-    289  f140		       b0 04		      bcs	.NoDrawP0	; 3
-    290  f142				   .DrawP0
-    291  f142		       b1 82		      lda	(P0spritePtr),Y	; 5
-    292  f144		       85 1b		      sta	GRP0	; 3
-    293  f146				   .NoDrawP0
-    294  f146
-    295  f146		       85 02		      sta	WSYNC	; wait for next scanline
-    296  f148		       88		      dey		; y--
-    297  f149		       d0 e8		      bne	.LoopVisible	; go back until x = 0
-    298  f14b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    299  f14b							;;;; end kernel
-    300  f14b
-    301  f14b							;;;; set timer for OVERSCAN
-    302  f14b		       a9 02		      lda	#2
-    303  f14d		       85 02		      sta	WSYNC
-    304  f14f		       85 01		      sta	VBLANK
-    305  f151		       a9 24		      lda	#36
-    306  f153		       8d 96 02 	      sta	TIM64T
-    307  f156
-    308  f156							;;;;  start game overscan logic
-    309  f156							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    310  f156							;;; cycle the Random a tick
-    311  f156		       20 e6 f1 	      jsr	Random
-    312  f159
-    313  f159							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    314  f159							;;;;  end game overscan logic
-    315  f159
-    316  f159
-    317  f159							;;;; Wait for rest of OVERSCAN
-    318  f159				   .OverscanWaitLoop
-    319  f159		       ad 84 02 	      lda	INTIM
-    320  f15c		       d0 fb		      bne	.OverscanWaitLoop
-    321  f15e		       a9 02		      lda	#2
-    322  f160		       85 02		      sta	WSYNC
-    323  f162
-    324  f162							;;; new frame
-    325  f162		       4c 54 f0 	      jmp	StartFrame
-    326  f165
-    327  f165							;;;;	start subroutines
-    328  f165							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    329  f165							;;; Load Score Pointers based on corresponding values
-    330  f165
-    331  f165				   ConsumeTime SUBROUTINE
-    332  f165		       f8		      sed
-    333  f166		       38		      sec
-    334  f167		       a5 84		      lda	P0time0
-    335  f169		       e9 01		      sbc	#1
-    336  f16b		       85 84		      sta	P0time0
-    337  f16d		       a5 85		      lda	P0time1
-    338  f16f		       e9 00		      sbc	#0
-    339  f171		       85 85		      sta	P0time1
-    340  f173		       d8		      cld
-    341  f174		       90 01		      bcc	TimesUp
-    342  f176		       60		      rts
-    343  f177				   TimesUp
-    344  f177							; time's up, set back to 0 and deactive countdown
-    345  f177		       a9 00		      lda	#0
-    346  f179		       85 84		      sta	P0time0
-    347  f17b		       85 85		      sta	P0time1
-    348  f17d		       85 8a		      sta	Active
-    349  f17f		       a9 3a		      lda	#<TimeBitmap
-    350  f181		       85 87		      sta	P0bitmap
-    351  f183		       60		      rts
-    352  f184
-    353  f184				   LoadScorePointers SUBROUTINE
-    354  f184							; first byte (two digits) of timer
-    355  f184		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    356  f186		       25 85		      and	P0time1	;
-    357  f188		       85 a0		      sta	LeftScorePtr0	; store as is (already x16)
-    358  f18a
-    359  f18a		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    360  f18c		       25 85		      and	P0time1	;
-    361  f18e		       0a		      asl		;
-    362  f18f		       0a		      asl		;
-    363  f190		       0a		      asl		;
-    364  f191		       0a		      asl		; multiply by 16
-    365  f192		       85 a2		      sta	LeftScorePtr1	; store in pointer
-    366  f194
-    367  f194							; second byte (two digits) of timer
-    368  f194		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    369  f196		       25 84		      and	P0time0	;
-    370  f198		       85 a4		      sta	LeftScorePtr2	; store as is (already x16)
-    371  f19a
-    372  f19a		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    373  f19c		       25 84		      and	P0time0	;
-    374  f19e		       0a		      asl		;
-    375  f19f		       0a		      asl		;
-    376  f1a0		       0a		      asl		;
-    377  f1a1		       0a		      asl		; multiply by 16
-    378  f1a2		       85 a6		      sta	LeftScorePtr3	; store in pointer
-    379  f1a4
-    380  f1a4		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    381  f1a6		       25 88		      and	LeftScore4	; load the digit
-    382  f1a8		       0a		      asl		;
-    383  f1a9		       0a		      asl		;
-    384  f1aa		       0a		      asl		;
-    385  f1ab		       0a		      asl		; multiply by 16
-    386  f1ac		       85 a8		      sta	LeftScorePtr4	; Put in LSB of ScrollPtr
-    387  f1ae
-    388  f1ae							; delay time countdown (MSB only)
-    389  f1ae		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    390  f1b0		       25 8b		      and	DelayTime	; load the digit
-    391  f1b2		       85 aa		      sta	LeftScorePtr5	; store as is (already x16)
-    392  f1b4
-    393  f1b4							; score digits
-    394  f1b4		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    395  f1b6		       25 86		      and	P0score	;
-    396  f1b8		       85 ac		      sta	RightScorePtr0	; store as is (already x16)
-    397  f1ba
-    398  f1ba		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    399  f1bc		       25 86		      and	P0score	;
-    400  f1be		       0a		      asl		;
-    401  f1bf		       0a		      asl		;
-    402  f1c0		       0a		      asl		;
-    403  f1c1		       0a		      asl		; multiply by 16
-    404  f1c2		       85 ae		      sta	RightScorePtr1	; store in pointer
-    405  f1c4
-    406  f1c4		       60		      rts
-    407  f1c5
-    408  f1c5							;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
-    409  f1c5							; Positions an object horizontally
-    410  f1c5							; Inputs: A = Desired position.
-    411  f1c5							; X = Desired object to be positioned (0-5). *jh* (P0, P1, M0, M1, Ball)
-    412  f1c5							; scanlines: If control comes on or before cycle 73 then 1 scanline is consumed.
-    413  f1c5							; If control comes after cycle 73 then 2 scanlines are consumed.
-    414  f1c5							; Outputs: X = unchanged
-    415  f1c5							; A = Fine Adjustment value.
-    416  f1c5							; Y = the "remainder" of the division by 15 minus an additional 15.
-    417  f1c5							; control is returned on cycle 6 of the next scanline.
-    418  f1c5				   PosObject  SUBROUTINE
-    419  f1c5
-    420  f1c5		       85 02		      STA	WSYNC	; 00 Sync to start of scanline.
-    421  f1c7		       38		      SEC		; 02 Set the carry flag so no borrow will be applied during the division.
-    422  f1c8				   .divideby15
-    423  f1c8		       e9 0f		      SBC	#15	; 04 ; Waste the necessary amount of time dividing X-pos by 15!
-    424  f1ca		       b0 fc		      BCS	.divideby15	; 06/07 - 11/16/21/26/31/36/41/46/51/56/61/66
-    425  f1cc
-    426  f1cc		       a8		      TAY		; 08 ; At this point the value in A is -1 to -15. In this code I use a table
-    427  f1cd							; to quickly convert that value to the fine adjust value needed.
-    428  f1cd		       b9 e6 f0 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
-    429  f1d0							; In your own code you may wish to consume only 4.
-    430  f1d0		       95 20		      STA	HMP0,X	; 17 Store the fine adjustment value.
-    431  f1d2		       95 10		      STA	RESP0,X	; 21/ 26/31/36/41/46/51/56/61/66/71 - Set the rough position.
-    432  f1d4
-    433  f1d4		       85 02		      STA	WSYNC
-    434  f1d6		       60		      RTS
-    435  f1d7
-    436  f1d7							;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
-    437  f1d7							;;; (see link for alternate way without lookup table)
-    438  f1d7
-    439  f1d7							;;; fine adjustment for PosObject
-    440  f1d7							;;; some explanation on "negative index" is here:
-    441  f1d7							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
-    442  f1d7
-    443  f1d7				   fineAdjustBegin
-    444  f1d7		       70		      DC.B	%01110000	; Left 7
-    445  f1d8		       60		      DC.B	%01100000	; Left 6
-    446  f1d9		       50		      DC.B	%01010000	; Left 5
-    447  f1da		       40		      DC.B	%01000000	; Left 4
-    448  f1db		       30		      DC.B	%00110000	; Left 3
-    449  f1dc		       20		      DC.B	%00100000	; Left 2
-    450  f1dd		       10		      DC.B	%00010000	; Left 1
-    451  f1de		       00		      DC.B	%00000000	; No movement.
-    452  f1df		       f0		      DC.B	%11110000	; Right 1
-    453  f1e0		       e0		      DC.B	%11100000	; Right 2
-    454  f1e1		       d0		      DC.B	%11010000	; Right 3
-    455  f1e2		       c0		      DC.B	%11000000	; Right 4
-    456  f1e3		       b0		      DC.B	%10110000	; Right 5
-    457  f1e4		       a0		      DC.B	%10100000	; Right 6
-    458  f1e5		       90		      DC.B	%10010000	; Right 7
-    459  f1e5		       f0 e6	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
-    460  f1e6
-    461  f1e6							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
-    462  f1e6				   Random
-    463  f1e6		       a5 8c		      lda	Rand8
-    464  f1e8		       4a		      lsr
-    465  f1e9		       90 02		      bcc	noeor
-    466  f1eb		       49 b4		      eor	#$B4
-    467  f1ed				   noeor
-    468  f1ed		       85 8c		      sta	Rand8
-    469  f1ef		       60		      rts
-    470  f1f0
-    471  f1f0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    472  f1f0							;;;;	end subroutines
-    473  f1f0
-    474  f1f0							;;;;  start ROM lookup tables
-    475  f1f0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    476  f200		       00 00 00 00*	      align	256
-    477  f200				   BitmapIndex
-    478  f200		       04		      byte.b	#<Lbitmap
-    479  f201		       0d		      byte.b	#<Rbitmap
-    480  f202		       1f		      byte.b	#<Ubitmap
-    481  f203		       16		      byte.b	#<Dbitmap
-    482  f204
-    483  f204				   BitmapTable
-    484  f204				   Lbitmap
-    485  f204		       00		      byte.b	#%00000000
-    486  f205		       10		      byte.b	#%00010000
-    487  f206		       30		      byte.b	#%00110000
-    488  f207		       7f		      byte.b	#%01111111
-    489  f208		       ff		      byte.b	#%11111111
-    490  f209		       7f		      byte.b	#%01111111
-    491  f20a		       30		      byte.b	#%00110000
-    492  f20b		       10		      byte.b	#%00010000
-    493  f20c		       00		      byte.b	#%00000000
-    494  f20d
-    495  f20d				   Rbitmap
-    496  f20d		       00		      byte.b	#%00000000
-    497  f20e		       08		      byte.b	#%00001000
-    498  f20f		       0c		      byte.b	#%00001100
-    499  f210		       fe		      byte.b	#%11111110
-    500  f211		       ff		      byte.b	#%11111111
-    501  f212		       fe		      byte.b	#%11111110
-    502  f213		       0c		      byte.b	#%00001100
-    503  f214		       08		      byte.b	#%00001000
-    504  f215		       00		      byte.b	#%00000000
-    505  f216
-    506  f216				   Dbitmap
-    507  f216		       00		      byte.b	#%00000000
-    508  f217		       10		      byte.b	#%00010000
-    509  f218		       38		      byte.b	#%00111000
-    510  f219		       7c		      byte.b	#%01111100
-    511  f21a		       fe		      byte.b	#%11111110
-    512  f21b		       38		      byte.b	#%00111000
-    513  f21c		       38		      byte.b	#%00111000
-    514  f21d		       38		      byte.b	#%00111000
-    515  f21e		       00		      byte.b	#%00000000
-    516  f21f
-    517  f21f				   Ubitmap
-    518  f21f		       00		      byte.b	#%00000000
-    519  f220		       38		      byte.b	#%00111000
-    520  f221		       38		      byte.b	#%00111000
-    521  f222		       38		      byte.b	#%00111000
-    522  f223		       fe		      byte.b	#%11111110
-    523  f224		       7c		      byte.b	#%01111100
-    524  f225		       38		      byte.b	#%00111000
-    525  f226		       10		      byte.b	#%00010000
-    526  f227		       00		      byte.b	#%00000000
-    527  f228
-    528  f228				   Xbitmap
-    529  f228		       00		      byte.b	#%00000000
-    530  f229		       82		      byte.b	#%10000010
-    531  f22a		       44		      byte.b	#%01000100
-    532  f22b		       28		      byte.b	#%00101000
-    533  f22c		       10		      byte.b	#%00010000
-    534  f22d		       28		      byte.b	#%00101000
-    535  f22e		       44		      byte.b	#%01000100
-    536  f22f		       82		      byte.b	#%10000010
-    537  f230		       00		      byte.b	#%00000000
-    538  f231
-    539  f231				   NullBitmap
-    540  f231		       00		      byte.b	#%00000000
-    541  f232		       00		      byte.b	#%00000000
-    542  f233		       00		      byte.b	#%00000000
-    543  f234		       00		      byte.b	#%00000000
-    544  f235		       00		      byte.b	#%00000000
-    545  f236		       00		      byte.b	#%00000000
-    546  f237		       00		      byte.b	#%00000000
-    547  f238		       00		      byte.b	#%00000000
-    548  f239		       00		      byte.b	#%00000000
-    549  f23a
-    550  f23a				   TimeBitmap
-    551  f23a		       00		      byte.b	#%00000000
-    552  f23b		       ff		      byte.b	#%11111111
-    553  f23c		       5a		      byte.b	#%01011010
-    554  f23d		       24		      byte.b	#%00100100
-    555  f23e		       18		      byte.b	#%00011000
-    556  f23f		       3c		      byte.b	#%00111100
-    557  f240		       42		      byte.b	#%01000010
-    558  f241		       ff		      byte.b	#%11111111
-    559  f242		       00		      byte.b	#%00000000
-    560  f243
-    561  f243				   P0color
-    562  f243		       00		      byte.b	#$00
-    563  f244		       00		      byte.b	#$00
-    564  f245		       00		      byte.b	#$00
-    565  f246		       00		      byte.b	#$00
-    566  f247		       00		      byte.b	#$00
-    567  f248		       00		      byte.b	#$00
-    568  f249		       00		      byte.b	#$00
-    569  f24a		       00		      byte.b	#$00
-    570  f24b		       00		      byte.b	#$00
-    571  f24c
-    572  f24c				   P0Index
-    573  f24c		       04		      byte.b	#<Lbitmap
-    574  f24d		       0d		      byte.b	#<Rbitmap
-    575  f24e		       1f		      byte.b	#<Ubitmap
-    576  f24f		       16		      byte.b	#<Dbitmap
-    577  f250		       31		      byte.b	#<NullBitmap
-    578  f251		       28		      byte.b	#<Xbitmap
-    579  f252
-    580  f252							;;; digits.h should set digitTable at the beginning followed by
-    581  f252							;;;	      an array of 16 bytes for each digit 0-9
+     58  f012							;;; Set initial P0bitmap to Up
+     59  f012		       a9 1f		      lda	#<Ubitmap
+     60  f014		       85 87		      sta	P0bitmap
+     61  f016							;;; player coordinates (match bitmap above)
+     62  f016		       ad 4e f3 	      lda	PositionX+2
+     63  f019		       85 80		      sta	P0x
+     64  f01b		       ad 52 f3 	      lda	PositionY+2
+     65  f01e		       85 81		      sta	P0y
+     66  f020							;;; Set high byte of P0spritePtr (low byte updated per frame)
+     67  f020		       a9 f3		      lda	#>BitmapTable
+     68  f022		       85 83		      sta	P0spriteHi
+     69  f024							;;; set timer to 999 (decimal)
+     70  f024		       a9 99		      lda	#153	; hex 99
+     71  f026		       85 84		      sta	P0time0
+     72  f028		       a9 09		      lda	#9
+     73  f02a		       85 85		      sta	P0time1
+     74  f02c
+     75  f02c							;;; check input but don't consume time
+     76  f02c		       a9 02		      lda	#%0000010
+     77  f02e		       85 8a		      sta	Active
+     78  f030
+     79  f030							;;; Set Score Digits
+     80  f030		       a9 0a		      lda	#$0a	; blank
+     81  f032		       85 88		      sta	LeftScore4
+     82  f034		       85 89		      sta	LeftScore5
+     83  f036
+     84  f036							;;; set up Score pointer high bytes
+     85  f036		       a9 f7		      lda	#>digitTableLeftRev
+     86  f038		       85 a1		      sta	LeftScorePtr0+1
+     87  f03a		       85 a9		      sta	LeftScorePtr4+1
+     88  f03c		       85 ab		      sta	LeftScorePtr5+1
+     89  f03e		       85 af		      sta	RightScorePtr1+1
+     90  f040		       a9 f5		      lda	#>digitTableLeft
+     91  f042		       85 a3		      sta	LeftScorePtr1+1
+     92  f044		       a9 f4		      lda	#>digitTableRight
+     93  f046		       85 a5		      sta	LeftScorePtr2+1
+     94  f048		       a9 f6		      lda	#>digitTableRightRev
+     95  f04a		       85 a7		      sta	LeftScorePtr3+1
+     96  f04c		       85 ad		      sta	RightScorePtr0+1
+     97  f04e
+     98  f04e							;;; register setup
+     99  f04e							; playfield color
+    100  f04e		       a9 37		      lda	#55
+    101  f050		       85 08		      sta	COLUPF
+    102  f052							; player/missile size register
+    103  f052		       a5 00		      lda	%00000000	; one player, single-sized
+    104  f054							;lda %00000101    ; one player, double-sized
+    105  f054							;lda %00000111    ; one player, quad-sized
+    106  f054		       85 04		      sta	NUSIZ0
+    107  f056							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    108  f056							;;;;  end variable initialization
+    109  f056
+    110  f056				   StartFrame
+    111  f056		       a9 02		      lda	#2
+    112  f058		       85 00		      sta	VSYNC
+    113  f05a
+    114  f05a							;;; 3 lines of VSYNC
+    115  f05a		       85 02		      sta	WSYNC	; store halts until scanline complete
+    116  f05c		       85 02		      sta	WSYNC	; 2nd
+    117  f05e		       85 02		      sta	WSYNC	; 3rd
+    118  f060
+    119  f060							;;;; set timer for VBLANK
+    120  f060		       a9 2c		      LDA	#44
+    121  f062		       8d 96 02 	      STA	TIM64T
+    122  f065
+    123  f065		       a9 00		      lda	#0
+    124  f067		       85 00		      sta	VSYNC	; turn off VSYNC
+    125  f069
+    126  f069							;;;;  start game vblank logic
+    127  f069							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    128  f069
+    129  f069							;;; Consume Time
+    130  f069		       20 88 f1 	      jsr	ConsumeTime	; checks 0 bit of Active
+    131  f06c							;;; check if open for input
+    132  f06c		       a9 02		      lda	#%00000010	; 1 bit of Active governs input
+    133  f06e		       24 8a		      bit	Active
+    134  f070		       f0 03		      beq	NotActive
+    135  f072		       4c b8 f0 	      jmp	CheckInput
+    136  f075							;;; not active so check if time to activate
+    137  f075				   NotActive
+    138  f075		       a5 8b		      lda	DelayTime
+    139  f077		       f0 3c		      beq	NoNewBitmap	; already zero
+    140  f079		       38		      sec
+    141  f07a		       e9 01		      sbc	#1
+    142  f07c		       85 8b		      sta	DelayTime
+    143  f07e		       d0 35		      bne	NoNewBitmap
+    144  f080				   NewBitmap
+    145  f080		       20 21 f2 	      jsr	Random	; get a random #
+    146  f083		       29 03		      and	#%00000011	; truncate to 2 bits
+    147  f085		       a8		      tay		; put in Y
+    148  f086		       18		      clc
+    149  f087		       b9 00 f3 	      lda	BitmapIndex,Y
+    150  f08a		       85 87		      sta	P0bitmap
+    151  f08c							; Update position
+    152  f08c		       a9 05		      lda	#5	; starting at 999 so half is roughly 500
+    153  f08e		       c5 85		      cmp	P0time1
+    154  f090		       b0 0d		      bcs	RandomPosition	; if 5 > P0time1
+    155  f092				   FixedPosition
+    156  f092		       b9 4c f3 	      lda	PositionX,Y
+    157  f095		       85 80		      sta	P0x
+    158  f097		       b9 50 f3 	      lda	PositionY,Y
+    159  f09a		       85 81		      sta	P0y
+    160  f09c		       4c b1 f0 	      jmp	SetActive
+    161  f09f				   RandomPosition
+    162  f09f		       20 21 f2 	      jsr	Random
+    163  f0a2		       29 7f		      and	#%01111111	; upper bound 127
+    164  f0a4		       09 10		      ora	#%00010000	; lower bound 16
+    165  f0a6		       85 80		      sta	P0x
+    166  f0a8		       20 21 f2 	      jsr	Random
+    167  f0ab		       29 7f		      and	#%01111111	; upper bound 127
+    168  f0ad		       09 10		      ora	#%00010000	; lower bound 16
+    169  f0af		       85 81		      sta	P0y
+    170  f0b1				   SetActive
+    171  f0b1							; set Active
+    172  f0b1		       a9 03		      lda	#3
+    173  f0b3		       85 8a		      sta	Active
+    174  f0b5				   NoNewBitmap
+    175  f0b5		       4c 07 f1 	      jmp	EndP0Input
+    176  f0b8
+    177  f0b8							;;; check input signals
+    178  f0b8				   CheckInput
+    179  f0b8		       a2 31		      ldx	#<NullBitmap
+    180  f0ba				   CheckP0Up
+    181  f0ba		       a9 10		      lda	#%00010000
+    182  f0bc		       2c 80 02 	      bit	SWCHA
+    183  f0bf		       d0 02		      bne	CheckP0Down
+    184  f0c1		       a2 1f		      ldx	#<Ubitmap
+    185  f0c3				   CheckP0Down
+    186  f0c3		       a9 20		      lda	#%00100000
+    187  f0c5		       2c 80 02 	      bit	SWCHA
+    188  f0c8		       d0 02		      bne	CheckP0Right
+    189  f0ca		       a2 16		      ldx	#<Dbitmap
+    190  f0cc				   CheckP0Right
+    191  f0cc		       a9 80		      lda	#%10000000
+    192  f0ce		       2c 80 02 	      bit	SWCHA
+    193  f0d1		       d0 02		      bne	CheckP0Left
+    194  f0d3		       a2 0d		      ldx	#<Rbitmap
+    195  f0d5				   CheckP0Left
+    196  f0d5		       a9 40		      lda	#%01000000
+    197  f0d7		       2c 80 02 	      bit	SWCHA
+    198  f0da		       d0 02		      bne	EndP0InputCheck
+    199  f0dc		       a2 04		      ldx	#<Lbitmap
+    200  f0de				   EndP0InputCheck
+    201  f0de
+    202  f0de							;;; do input-related processing
+    203  f0de				   CheckInputCorrect
+    204  f0de		       e0 31		      cpx	#<NullBitmap	; if x hasn't changed
+    205  f0e0		       f0 25		      beq	EndP0Input	; we didn't get input
+    206  f0e2		       a9 00		      lda	#0	; if we did get input
+    207  f0e4		       85 8a		      sta	Active	; stop time counter and input checking
+    208  f0e6		       e4 87		      cpx	P0bitmap	; check if input matches icon
+    209  f0e8		       d0 10		      bne	P0Incorrect
+    210  f0ea				   P0Correct
+    211  f0ea							; increment (decimal) score
+    212  f0ea		       18		      clc
+    213  f0eb		       a5 86		      lda	P0score
+    214  f0ed		       f8		      sed
+    215  f0ee		       69 01		      adc	#1
+    216  f0f0		       85 86		      sta	P0score
+    217  f0f2		       d8		      cld
+    218  f0f3							; set bitmap to null
+    219  f0f3		       a9 31		      lda	#<NullBitmap
+    220  f0f5		       85 87		      sta	P0bitmap
+    221  f0f7		       4c fe f0 	      jmp	SetDelay
+    222  f0fa				   P0Incorrect
+    223  f0fa		       a9 28		      lda	#<Xbitmap	; set bitmap to X
+    224  f0fc		       85 87		      sta	P0bitmap
+    225  f0fe				   SetDelay
+    226  f0fe							; set a random delay
+    227  f0fe		       20 21 f2 	      jsr	Random
+    228  f101		       29 3f		      and	#%00111111	; max 127 (around 2.5 second)
+    229  f103		       09 20		      ora	#%00100000	; min 31 (a little more than 1/2 second)
+    230  f105		       85 8b		      sta	DelayTime
+    231  f107							;;; end of input processing
+    232  f107				   EndP0Input
+    233  f107
+    234  f107							;;; P0 horizontal position
+    235  f107		       a2 00		      ldx	#0
+    236  f109		       a5 80		      lda	P0x
+    237  f10b		       20 00 f2 	      jsr	PosObject
+    238  f10e							;;; P0 vertical position
+    239  f10e		       a5 87		      lda	P0bitmap	; bitmap base
+    240  f110		       18		      clc		; clear carry for add
+    241  f111		       69 09		      adc	#P0HEIGHT	; bitmap high end
+    242  f113		       38		      sec		; set carry for subtract
+    243  f114		       e5 81		      sbc	P0y	; offset by P0y for draw logic
+    244  f116		       85 82		      sta	P0spritePtr	; store in sprite pointer
+    245  f118		       a9 f3		      lda	#>BitmapTable	; load 2nd byte of bitmap table
+    246  f11a		       e9 00		      sbc	#0	; subtract 0 (decrements if carry is clear from previous)
+    247  f11c		       85 83		      sta	P0spritePtr+1	; store in high byte of sprite pointer
+    248  f11e
+    249  f11e							;;; Setup score pointers for display
+    250  f11e		       20 b8 f1 	      jsr	LoadScorePointers
+    251  f121
+    252  f121							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    253  f121							;;;;  end game vblank logic
+    254  f121
+    255  f121							;;;; Wait for rest of VBLANK
+    256  f121				   .VblankWaitLoop
+    257  f121		       ad 84 02 	      lda	INTIM	; load timer interrupt
+    258  f124		       d0 fb		      bne	.VblankWaitLoop
+    259  f126		       85 02		      sta	WSYNC	; wait for next wsync
+    260  f128		       85 01		      sta	VBLANK	; turn off VBlank
+    261  f12a
+    262  f12a							;;;; kernel (192 visible scan lines)
+    263  f12a							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    264  f12a		       a0 0e		      ldy	#14
+    265  f12c							;;; display 14 rows of "score"
+    266  f12c				   .ScrollLoop
+    267  f12c		       85 02		      sta	WSYNC	; 3| 0
+    268  f12e		       b1 a0		      lda	(LeftScorePtr0),Y	; 5| 5 PF0 is single digit
+    269  f130		       85 0d		      sta	PF0	; 3| 8
+    270  f132		       b1 a2		      lda	(LeftScorePtr1),Y	; 4|12
+    271  f134		       11 a4		      ora	(LeftScorePtr2),Y	; 5|17
+    272  f136		       85 0e		      sta	PF1	; 3|20
+    273  f138		       b1 a6		      lda	(LeftScorePtr3),Y	; 5|25
+    274  f13a		       11 a8		      ora	(LeftScorePtr4),Y	; 5|30
+    275  f13c		       85 0f		      sta	PF2	; 3|33
+    276  f13e		       b1 aa		      lda	(LeftScorePtr5),Y	; 5|38
+    277  f140		       85 0d		      sta	PF0	; 3|41
+    278  f142							;; need to redo counts
+    279  f142							;	lda (ScrollPtr6),Y	; 5|46
+    280  f142							;	ora (ScrollPtr7),Y	; 5|51
+    281  f142		       a9 00		      lda	#0
+    282  f144		       85 0e		      sta	PF1	; 3|54
+    283  f146		       b1 ac		      lda	(RightScorePtr0),Y	; 5|59
+    284  f148		       11 ae		      ora	(RightScorePtr1),Y	; 5|64
+    285  f14a		       85 0f		      sta	PF2	; 3|67
+    286  f14c		       88		      dey		; 2|69
+    287  f14d		       d0 dd		      bne	.ScrollLoop	; 3|75/76
+    288  f14f
+    289  f14f							;;; one more black line before moving to play area
+    290  f14f		       85 02		      sta	WSYNC
+    291  f151		       a0 b1		      ldy	#177	; counter
+    292  f153		       a2 00		      ldx	#0	; first GRP0 should be 0
+    293  f155				   .LoopVisible
+    294  f155							;;; for rainbow background
+    295  f155		       86 1b		      stx	GRP0	; 3 (calculated on previous line)
+    296  f157		       84 09		      sty	COLUBK	; set bg color to loop var
+    297  f159
+    298  f159							;;; draw P0
+    299  f159		       38		      sec		; 2 set carry
+    300  f15a		       98		      tya		; 2
+    301  f15b		       e5 81		      sbc	P0y	; 3
+    302  f15d		       65 09		      adc	P0HEIGHT	; 2
+    303  f15f		       b0 05		      bcs	.DrawP0
+    304  f161
+    305  f161		       ea		      nop		; 2
+    306  f162		       ea		      nop		; 2
+    307  f163		       38		      sec		; 2
+    308  f164		       b0 03		      bcs	.NoDrawP0	; 3
+    309  f166				   .DrawP0
+    310  f166		       b1 82		      lda	(P0spritePtr),Y	; 5
+    311  f168		       aa		      tax
+    312  f169				   .NoDrawP0
+    313  f169
+    314  f169		       85 02		      sta	WSYNC	; wait for next scanline
+    315  f16b		       88		      dey		; y--
+    316  f16c		       d0 e7		      bne	.LoopVisible	; go back until x = 0
+    317  f16e							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    318  f16e							;;;; end kernel
+    319  f16e
+    320  f16e							;;;; set timer for OVERSCAN
+    321  f16e		       a9 02		      lda	#2
+    322  f170		       85 02		      sta	WSYNC
+    323  f172		       85 01		      sta	VBLANK
+    324  f174		       a9 24		      lda	#36
+    325  f176		       8d 96 02 	      sta	TIM64T
+    326  f179
+    327  f179							;;;;  start game overscan logic
+    328  f179							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    329  f179							;;; cycle the Random a tick
+    330  f179		       20 21 f2 	      jsr	Random
+    331  f17c
+    332  f17c							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    333  f17c							;;;;  end game overscan logic
+    334  f17c
+    335  f17c
+    336  f17c							;;;; Wait for rest of OVERSCAN
+    337  f17c				   .OverscanWaitLoop
+    338  f17c		       ad 84 02 	      lda	INTIM
+    339  f17f		       d0 fb		      bne	.OverscanWaitLoop
+    340  f181		       a9 02		      lda	#2
+    341  f183		       85 02		      sta	WSYNC
+    342  f185
+    343  f185							;;; new frame
+    344  f185		       4c 56 f0 	      jmp	StartFrame
+    345  f188
+    346  f188							;;;;	start subroutines
+    347  f188							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    348  f188							;;; Load Score Pointers based on corresponding values
+    349  f188
+    350  f188				   ConsumeTime SUBROUTINE
+    351  f188		       a9 01		      lda	#%00000001	; 0 bit of Active governs time
+    352  f18a		       24 8a		      bit	Active
+    353  f18c		       d0 01		      bne	UseTime
+    354  f18e		       60		      rts
+    355  f18f				   UseTime
+    356  f18f		       f8		      sed
+    357  f190		       38		      sec
+    358  f191		       a5 84		      lda	P0time0
+    359  f193		       e9 01		      sbc	#1
+    360  f195		       85 84		      sta	P0time0
+    361  f197		       a5 85		      lda	P0time1
+    362  f199		       e9 00		      sbc	#0
+    363  f19b		       85 85		      sta	P0time1
+    364  f19d		       d8		      cld
+    365  f19e		       90 01		      bcc	TimesUp
+    366  f1a0		       60		      rts
+    367  f1a1				   TimesUp
+    368  f1a1							; time's up, set back to 0 and deactivate countdown
+    369  f1a1		       a9 00		      lda	#0
+    370  f1a3		       85 84		      sta	P0time0
+    371  f1a5		       85 85		      sta	P0time1
+    372  f1a7		       85 8a		      sta	Active
+    373  f1a9		       a9 3a		      lda	#<TimeBitmap
+    374  f1ab		       85 87		      sta	P0bitmap
+    375  f1ad		       ad 4e f3 	      lda	PositionX+2
+    376  f1b0		       85 80		      sta	P0x
+    377  f1b2		       ad 50 f3 	      lda	PositionY
+    378  f1b5		       85 81		      sta	P0y
+    379  f1b7		       60		      rts
+    380  f1b8
+    381  f1b8				   LoadScorePointers SUBROUTINE
+    382  f1b8							; first byte (two digits) of timer
+    383  f1b8		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    384  f1ba		       25 85		      and	P0time1	;
+    385  f1bc		       85 a0		      sta	LeftScorePtr0	; store as is (already x16)
+    386  f1be
+    387  f1be		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    388  f1c0		       25 85		      and	P0time1	;
+    389  f1c2		       0a		      asl		;
+    390  f1c3		       0a		      asl		;
+    391  f1c4		       0a		      asl		;
+    392  f1c5		       0a		      asl		; multiply by 16
+    393  f1c6		       85 a2		      sta	LeftScorePtr1	; store in pointer
+    394  f1c8
+    395  f1c8							; second byte (two digits) of timer
+    396  f1c8		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    397  f1ca		       25 84		      and	P0time0	;
+    398  f1cc		       85 a4		      sta	LeftScorePtr2	; store as is (already x16)
+    399  f1ce
+    400  f1ce		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    401  f1d0		       25 84		      and	P0time0	;
+    402  f1d2		       0a		      asl		;
+    403  f1d3		       0a		      asl		;
+    404  f1d4		       0a		      asl		;
+    405  f1d5		       0a		      asl		; multiply by 16
+    406  f1d6		       85 a6		      sta	LeftScorePtr3	; store in pointer
+    407  f1d8
+    408  f1d8		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    409  f1da		       25 88		      and	LeftScore4	; load the digit
+    410  f1dc		       0a		      asl		;
+    411  f1dd		       0a		      asl		;
+    412  f1de		       0a		      asl		;
+    413  f1df		       0a		      asl		; multiply by 16
+    414  f1e0		       85 a8		      sta	LeftScorePtr4	; Put in LSB of ScrollPtr
+    415  f1e2
+    416  f1e2							; delay time countdown (MSB only)
+    417  f1e2		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    418  f1e4		       25 8b		      and	DelayTime	; load the digit
+    419  f1e6		       85 aa		      sta	LeftScorePtr5	; store as is (already x16)
+    420  f1e8
+    421  f1e8							; score digits
+    422  f1e8		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    423  f1ea		       25 86		      and	P0score	;
+    424  f1ec		       85 ac		      sta	RightScorePtr0	; store as is (already x16)
+    425  f1ee
+    426  f1ee		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    427  f1f0		       25 86		      and	P0score	;
+    428  f1f2		       0a		      asl		;
+    429  f1f3		       0a		      asl		;
+    430  f1f4		       0a		      asl		;
+    431  f1f5		       0a		      asl		; multiply by 16
+    432  f1f6		       85 ae		      sta	RightScorePtr1	; store in pointer
+    433  f1f8
+    434  f1f8		       60		      rts
+    435  f1f9
+    436  f200		       00 00 00 00*	      align	256	; PosObject is timing dependent and can't cross page boundaries
+    437  f200							;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
+    438  f200							; Positions an object horizontally
+    439  f200							; Inputs: A = Desired position.
+    440  f200							; X = Desired object to be positioned (0-5). *jh* (P0, P1, M0, M1, Ball)
+    441  f200							; scanlines: If control comes on or before cycle 73 then 1 scanline is consumed.
+    442  f200							; If control comes after cycle 73 then 2 scanlines are consumed.
+    443  f200							; Outputs: X = unchanged
+    444  f200							; A = Fine Adjustment value.
+    445  f200							; Y = the "remainder" of the division by 15 minus an additional 15.
+    446  f200							; control is returned on cycle 6 of the next scanline.
+    447  f200				   PosObject  SUBROUTINE
+    448  f200
+    449  f200		       85 02		      STA	WSYNC	; 00 Sync to start of scanline.
+    450  f202		       38		      SEC		; 02 Set the carry flag so no borrow will be applied during the division.
+    451  f203				   .divideby15
+    452  f203		       e9 0f		      SBC	#15	; 04 ; Waste the necessary amount of time dividing X-pos by 15!
+    453  f205		       b0 fc		      BCS	.divideby15	; 06/07 - 11/16/21/26/31/36/41/46/51/56/61/66
+    454  f207
+    455  f207		       a8		      TAY		; 08 ; At this point the value in A is -1 to -15. In this code I use a table
+    456  f208							; to quickly convert that value to the fine adjust value needed.
+    457  f208		       b9 21 f1 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
+    458  f20b							; In your own code you may wish to consume only 4.
+    459  f20b		       95 20		      STA	HMP0,X	; 17 Store the fine adjustment value.
+    460  f20d		       95 10		      STA	RESP0,X	; 21/ 26/31/36/41/46/51/56/61/66/71 - Set the rough position.
+    461  f20f
+    462  f20f		       85 02		      STA	WSYNC
+    463  f211		       60		      RTS
+    464  f212
+    465  f212							;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
+    466  f212							;;; (see link for alternate way without lookup table)
+    467  f212
+    468  f212							;;; fine adjustment for PosObject
+    469  f212							;;; some explanation on "negative index" is here:
+    470  f212							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
+    471  f212
+    472  f212				   fineAdjustBegin
+    473  f212		       70		      DC.B	%01110000	; Left 7
+    474  f213		       60		      DC.B	%01100000	; Left 6
+    475  f214		       50		      DC.B	%01010000	; Left 5
+    476  f215		       40		      DC.B	%01000000	; Left 4
+    477  f216		       30		      DC.B	%00110000	; Left 3
+    478  f217		       20		      DC.B	%00100000	; Left 2
+    479  f218		       10		      DC.B	%00010000	; Left 1
+    480  f219		       00		      DC.B	%00000000	; No movement.
+    481  f21a		       f0		      DC.B	%11110000	; Right 1
+    482  f21b		       e0		      DC.B	%11100000	; Right 2
+    483  f21c		       d0		      DC.B	%11010000	; Right 3
+    484  f21d		       c0		      DC.B	%11000000	; Right 4
+    485  f21e		       b0		      DC.B	%10110000	; Right 5
+    486  f21f		       a0		      DC.B	%10100000	; Right 6
+    487  f220		       90		      DC.B	%10010000	; Right 7
+    488  f220		       f1 21	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
+    489  f221
+    490  f221							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
+    491  f221				   Random
+    492  f221		       a5 8c		      lda	Rand8
+    493  f223		       4a		      lsr
+    494  f224		       90 02		      bcc	noeor
+    495  f226		       49 b4		      eor	#$B4
+    496  f228				   noeor
+    497  f228		       85 8c		      sta	Rand8
+    498  f22a		       60		      rts
+    499  f22b
+    500  f22b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    501  f22b							;;;;	end subroutines
+    502  f22b
+    503  f22b							;;;;  start ROM lookup tables
+    504  f22b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    505  f300		       00 00 00 00*	      align	256
+    506  f300				   BitmapIndex
+    507  f300		       04		      byte.b	#<Lbitmap
+    508  f301		       0d		      byte.b	#<Rbitmap
+    509  f302		       1f		      byte.b	#<Ubitmap
+    510  f303		       16		      byte.b	#<Dbitmap
+    511  f304
+    512  f304				   BitmapTable
+    513  f304				   Lbitmap
+    514  f304		       00		      byte.b	#%00000000
+    515  f305		       10		      byte.b	#%00010000
+    516  f306		       30		      byte.b	#%00110000
+    517  f307		       7f		      byte.b	#%01111111
+    518  f308		       ff		      byte.b	#%11111111
+    519  f309		       7f		      byte.b	#%01111111
+    520  f30a		       30		      byte.b	#%00110000
+    521  f30b		       10		      byte.b	#%00010000
+    522  f30c		       00		      byte.b	#%00000000
+    523  f30d
+    524  f30d				   Rbitmap
+    525  f30d		       00		      byte.b	#%00000000
+    526  f30e		       08		      byte.b	#%00001000
+    527  f30f		       0c		      byte.b	#%00001100
+    528  f310		       fe		      byte.b	#%11111110
+    529  f311		       ff		      byte.b	#%11111111
+    530  f312		       fe		      byte.b	#%11111110
+    531  f313		       0c		      byte.b	#%00001100
+    532  f314		       08		      byte.b	#%00001000
+    533  f315		       00		      byte.b	#%00000000
+    534  f316
+    535  f316				   Dbitmap
+    536  f316		       00		      byte.b	#%00000000
+    537  f317		       10		      byte.b	#%00010000
+    538  f318		       38		      byte.b	#%00111000
+    539  f319		       7c		      byte.b	#%01111100
+    540  f31a		       fe		      byte.b	#%11111110
+    541  f31b		       38		      byte.b	#%00111000
+    542  f31c		       38		      byte.b	#%00111000
+    543  f31d		       38		      byte.b	#%00111000
+    544  f31e		       00		      byte.b	#%00000000
+    545  f31f
+    546  f31f				   Ubitmap
+    547  f31f		       00		      byte.b	#%00000000
+    548  f320		       38		      byte.b	#%00111000
+    549  f321		       38		      byte.b	#%00111000
+    550  f322		       38		      byte.b	#%00111000
+    551  f323		       fe		      byte.b	#%11111110
+    552  f324		       7c		      byte.b	#%01111100
+    553  f325		       38		      byte.b	#%00111000
+    554  f326		       10		      byte.b	#%00010000
+    555  f327		       00		      byte.b	#%00000000
+    556  f328
+    557  f328				   Xbitmap
+    558  f328		       00		      byte.b	#%00000000
+    559  f329		       82		      byte.b	#%10000010
+    560  f32a		       44		      byte.b	#%01000100
+    561  f32b		       28		      byte.b	#%00101000
+    562  f32c		       10		      byte.b	#%00010000
+    563  f32d		       28		      byte.b	#%00101000
+    564  f32e		       44		      byte.b	#%01000100
+    565  f32f		       82		      byte.b	#%10000010
+    566  f330		       00		      byte.b	#%00000000
+    567  f331
+    568  f331				   NullBitmap
+    569  f331		       00		      byte.b	#%00000000
+    570  f332		       00		      byte.b	#%00000000
+    571  f333		       00		      byte.b	#%00000000
+    572  f334		       00		      byte.b	#%00000000
+    573  f335		       00		      byte.b	#%00000000
+    574  f336		       00		      byte.b	#%00000000
+    575  f337		       00		      byte.b	#%00000000
+    576  f338		       00		      byte.b	#%00000000
+    577  f339		       00		      byte.b	#%00000000
+    578  f33a
+    579  f33a				   TimeBitmap
+    580  f33a		       00		      byte.b	#%00000000
+    581  f33b		       ff		      byte.b	#%11111111
+    582  f33c		       5a		      byte.b	#%01011010
+    583  f33d		       24		      byte.b	#%00100100
+    584  f33e		       18		      byte.b	#%00011000
+    585  f33f		       24		      byte.b	#%00100100
+    586  f340		       42		      byte.b	#%01000010
+    587  f341		       ff		      byte.b	#%11111111
+    588  f342		       00		      byte.b	#%00000000
+    589  f343
+    590  f343				   P0color
+    591  f343		       00		      byte.b	#$00
+    592  f344		       00		      byte.b	#$00
+    593  f345		       00		      byte.b	#$00
+    594  f346		       00		      byte.b	#$00
+    595  f347		       00		      byte.b	#$00
+    596  f348		       00		      byte.b	#$00
+    597  f349		       00		      byte.b	#$00
+    598  f34a		       00		      byte.b	#$00
+    599  f34b		       00		      byte.b	#$00
+    600  f34c
+    601  f34c							;;; X and Y location per directional icon
+    602  f34c				   PositionX
+    603  f34c		       35		      byte.b	#53	; left
+    604  f34d		       6b		      byte.b	#107	; right
+    605  f34e		       50		      byte.b	#80	; up
+    606  f34f		       50		      byte.b	#80	; down
+    607  f350
+    608  f350				   PositionY
+    609  f350		       5d		      byte.b	#93	; left (177/2 - 9/2)
+    610  f351		       5d		      byte.b	#93	; right
+    611  f352		       80		      byte.b	#128	; up
+    612  f353		       3b		      byte.b	#59	; down
+    613  f354
+    614  f354							;;; digits.h should set digitTable at the beginning followed by
+    615  f354							;;;	      an array of 16 bytes for each digit 0-9
 ------- FILE digitTableRight.h LEVEL 2 PASS 2
-      0  f252					      include	"digitTableRight.h"
-      1  f300		       00 00 00 00*	      align	256
-      2  f300				   digitTableRight
-      3  f300							; 0
-      4  f300		       00		      .byte.b	%00000000	;|
-      5  f301		       00		      .byte.b	%00000000	;|
-      6  f302		       04		      .byte.b	%00000100	;| X
-      7  f303		       04		      .byte.b	%00000100	;| X
-      8  f304		       0e		      .byte.b	%00001110	;|XXX
-      9  f305		       0a		      .byte.b	%00001010	;|X X
-     10  f306		       0a		      .byte.b	%00001010	;|X X
-     11  f307		       0a		      .byte.b	%00001010	;|X X
-     12  f308		       0a		      .byte.b	%00001010	;|X X
-     13  f309		       0a		      .byte.b	%00001010	;|X X
-     14  f30a		       0a		      .byte.b	%00001010	;|X X
-     15  f30b		       0e		      .byte.b	%00001110	;|XXX
-     16  f30c		       04		      .byte.b	%00000100	;| X
-     17  f30d		       04		      .byte.b	%00000100	;| X
-     18  f30e		       00		      .byte.b	%00000000	;|
-     19  f30f		       00		      .byte.b	%00000000	;|
-     20  f310							; 1
-     21  f310		       00		      .byte.b	%00000000	;|
-     22  f311		       00		      .byte.b	%00000000	;|
-     23  f312		       0e		      .byte.b	%00001110	;|XXX
-     24  f313		       0e		      .byte.b	%00001110	;|XXX
-     25  f314		       0e		      .byte.b	%00001110	;|XXX
-     26  f315		       04		      .byte.b	%00000100	;| X
-     27  f316		       04		      .byte.b	%00000100	;| X
-     28  f317		       04		      .byte.b	%00000100	;| X
-     29  f318		       04		      .byte.b	%00000100	;| X
-     30  f319		       04		      .byte.b	%00000100	;| X
-     31  f31a		       04		      .byte.b	%00000100	;| X
-     32  f31b		       0c		      .byte.b	%00001100	;|XX
-     33  f31c		       0c		      .byte.b	%00001100	;|XX
-     34  f31d		       04		      .byte.b	%00000100	;| X
-     35  f31e		       00		      .byte.b	%00000000	;|
-     36  f31f		       00		      .byte.b	%00000000	;|
-     37  f320							; 2
-     38  f320		       00		      .byte.b	%00000000	;|
-     39  f321		       00		      .byte.b	%00000000	;|
-     40  f322		       0e		      .byte.b	%00001110	;|XXX
-     41  f323		       0e		      .byte.b	%00001110	;|XXX
-     42  f324		       08		      .byte.b	%00001000	;|X
-     43  f325		       08		      .byte.b	%00001000	;|X
-     44  f326		       0c		      .byte.b	%00001100	;|XX
-     45  f327		       06		      .byte.b	%00000110	;| XX
-     46  f328		       06		      .byte.b	%00000110	;| XX
-     47  f329		       02		      .byte.b	%00000010	;|  X
-     48  f32a		       0a		      .byte.b	%00001010	;|X X
-     49  f32b		       0e		      .byte.b	%00001110	;|XXX
-     50  f32c		       0e		      .byte.b	%00001110	;|XXX
-     51  f32d		       04		      .byte.b	%00000100	;| X
-     52  f32e		       00		      .byte.b	%00000000	;|
-     53  f32f		       00		      .byte.b	%00000000	;|
-     54  f330							; 3
-     55  f330		       00		      .byte.b	%00000000	;|
-     56  f331		       00		      .byte.b	%00000000	;|
-     57  f332		       04		      .byte.b	%00000100	;| X
-     58  f333		       04		      .byte.b	%00000100	;| X
-     59  f334		       0e		      .byte.b	%00001110	;|XXX
-     60  f335		       0a		      .byte.b	%00001010	;|X X
-     61  f336		       02		      .byte.b	%00000010	;|  X
-     62  f337		       04		      .byte.b	%00000100	;| X
-     63  f338		       06		      .byte.b	%00000110	;| XX
-     64  f339		       02		      .byte.b	%00000010	;|  X
-     65  f33a		       0a		      .byte.b	%00001010	;|X X
-     66  f33b		       0e		      .byte.b	%00001110	;|XXX
-     67  f33c		       04		      .byte.b	%00000100	;| X
-     68  f33d		       04		      .byte.b	%00000100	;| X
-     69  f33e		       00		      .byte.b	%00000000	;|
-     70  f33f		       00		      .byte.b	%00000000	;|
-     71  f340							; 4
-     72  f340		       00		      .byte.b	%00000000	;|
-     73  f341		       00		      .byte.b	%00000000	;|
-     74  f342		       02		      .byte.b	%00000010	;|  X
-     75  f343		       02		      .byte.b	%00000010	;|  X
-     76  f344		       02		      .byte.b	%00000010	;|  X
-     77  f345		       02		      .byte.b	%00000010	;|  X
-     78  f346		       0e		      .byte.b	%00001110	;|XXX
-     79  f347		       0e		      .byte.b	%00001110	;|XXX
-     80  f348		       0e		      .byte.b	%00001110	;|XXX
-     81  f349		       0a		      .byte.b	%00001010	;|X X
-     82  f34a		       0a		      .byte.b	%00001010	;|X X
-     83  f34b		       0a		      .byte.b	%00001010	;|X X
-     84  f34c		       0a		      .byte.b	%00001010	;|X X
-     85  f34d		       0a		      .byte.b	%00001010	;|X X
-     86  f34e		       00		      .byte.b	%00000000	;|
-     87  f34f		       00		      .byte.b	%00000000	;|
-     88  f350							; 5
-     89  f350		       00		      .byte.b	%00000000	;|
-     90  f351		       00		      .byte.b	%00000000	;|
-     91  f352		       04		      .byte.b	%00000100	;| X
-     92  f353		       0e		      .byte.b	%00001110	;|XXX
-     93  f354		       0a		      .byte.b	%00001010	;|X X
-     94  f355		       02		      .byte.b	%00000010	;|  X
-     95  f356		       02		      .byte.b	%00000010	;|  X
-     96  f357		       06		      .byte.b	%00000110	;| XX
-     97  f358		       0c		      .byte.b	%00001100	;|XX
-     98  f359		       0c		      .byte.b	%00001100	;|XX
-     99  f35a		       08		      .byte.b	%00001000	;|X
-    100  f35b		       08		      .byte.b	%00001000	;|X
-    101  f35c		       0e		      .byte.b	%00001110	;|XXX
-    102  f35d		       0e		      .byte.b	%00001110	;|XXX
-    103  f35e		       00		      .byte.b	%00000000	;|
-    104  f35f		       00		      .byte.b	%00000000	;|
-    105  f360							; 6
-    106  f360		       00		      .byte.b	%00000000	;|
-    107  f361		       00		      .byte.b	%00000000	;|
-    108  f362		       04		      .byte.b	%00000100	;| X
-    109  f363		       04		      .byte.b	%00000100	;| X
-    110  f364		       0e		      .byte.b	%00001110	;|XXX
-    111  f365		       0a		      .byte.b	%00001010	;|X X
-    112  f366		       0a		      .byte.b	%00001010	;|X X
-    113  f367		       0e		      .byte.b	%00001110	;|XXX
-    114  f368		       0c		      .byte.b	%00001100	;|XX
-    115  f369		       08		      .byte.b	%00001000	;|X
-    116  f36a		       08		      .byte.b	%00001000	;|X
-    117  f36b		       08		      .byte.b	%00001000	;|X
-    118  f36c		       0e		      .byte.b	%00001110	;|XXX
-    119  f36d		       06		      .byte.b	%00000110	;| XX
-    120  f36e		       00		      .byte.b	%00000000	;|
-    121  f36f		       00		      .byte.b	%00000000	;|
-    122  f370							; 7
-    123  f370		       00		      .byte.b	%00000000	;|
-    124  f371		       00		      .byte.b	%00000000	;|
-    125  f372		       08		      .byte.b	%00001000	;|X
-    126  f373		       08		      .byte.b	%00001000	;|X
-    127  f374		       08		      .byte.b	%00001000	;|X
-    128  f375		       04		      .byte.b	%00000100	;| X
-    129  f376		       04		      .byte.b	%00000100	;| X
-    130  f377		       04		      .byte.b	%00000100	;| X
-    131  f378		       06		      .byte.b	%00000110	;| XX
-    132  f379		       02		      .byte.b	%00000010	;|  X
-    133  f37a		       02		      .byte.b	%00000010	;|  X
-    134  f37b		       0a		      .byte.b	%00001010	;|X X
-    135  f37c		       0e		      .byte.b	%00001110	;|XXX
-    136  f37d		       0e		      .byte.b	%00001110	;|XXX
-    137  f37e		       00		      .byte.b	%00000000	;|
-    138  f37f		       00		      .byte.b	%00000000	;|
-    139  f380							; 8
-    140  f380		       00		      .byte.b	%00000000	;|
-    141  f381		       00		      .byte.b	%00000000	;|
-    142  f382		       04		      .byte.b	%00000100	;| X
-    143  f383		       0e		      .byte.b	%00001110	;|XXX
-    144  f384		       0a		      .byte.b	%00001010	;|X X
-    145  f385		       0a		      .byte.b	%00001010	;|X X
-    146  f386		       0a		      .byte.b	%00001010	;|X X
-    147  f387		       04		      .byte.b	%00000100	;| X
-    148  f388		       04		      .byte.b	%00000100	;| X
-    149  f389		       0a		      .byte.b	%00001010	;|X X
-    150  f38a		       0a		      .byte.b	%00001010	;|X X
-    151  f38b		       0a		      .byte.b	%00001010	;|X X
-    152  f38c		       0e		      .byte.b	%00001110	;|XXX
-    153  f38d		       04		      .byte.b	%00000100	;| X
-    154  f38e		       00		      .byte.b	%00000000	;|
-    155  f38f		       00		      .byte.b	%00000000	;|
-    156  f390							; 9
-    157  f390		       00		      .byte.b	%00000000	;|
-    158  f391		       00		      .byte.b	%00000000	;|
-    159  f392		       0c		      .byte.b	%00001100	;|XX
-    160  f393		       0e		      .byte.b	%00001110	;|XXX
-    161  f394		       02		      .byte.b	%00000010	;|  X
-    162  f395		       02		      .byte.b	%00000010	;|  X
-    163  f396		       06		      .byte.b	%00000110	;| XX
-    164  f397		       0e		      .byte.b	%00001110	;|XXX
-    165  f398		       0a		      .byte.b	%00001010	;|X X
-    166  f399		       0a		      .byte.b	%00001010	;|X X
-    167  f39a		       0a		      .byte.b	%00001010	;|X X
-    168  f39b		       0e		      .byte.b	%00001110	;|XXX
-    169  f39c		       0c		      .byte.b	%00001100	;|XX
-    170  f39d		       04		      .byte.b	%00000100	;| X
-    171  f39e		       00		      .byte.b	%00000000	;|
-    172  f39f		       00		      .byte.b	%00000000	;|
-    173  f3a0							; blank
-    174  f3a0		       00		      .byte.b	%00000000	;|
-    175  f3a1		       00		      .byte.b	%00000000	;|
-    176  f3a2		       00		      .byte.b	%00000000	;|
-    177  f3a3		       00		      .byte.b	%00000000	;|
-    178  f3a4		       00		      .byte.b	%00000000	;|
-    179  f3a5		       00		      .byte.b	%00000000	;|
-    180  f3a6		       00		      .byte.b	%00000000	;|
-    181  f3a7		       00		      .byte.b	%00000000	;|
-    182  f3a8		       00		      .byte.b	%00000000	;|
-    183  f3a9		       00		      .byte.b	%00000000	;|
-    184  f3aa		       00		      .byte.b	%00000000	;|
-    185  f3ab		       00		      .byte.b	%00000000	;|
-    186  f3ac		       00		      .byte.b	%00000000	;|
-    187  f3ad		       00		      .byte.b	%00000000	;|
-    188  f3ae		       00		      .byte.b	%00000000	;|
-    189  f3af		       00		      .byte.b	%00000000	;|
-    190  f3b0							; decimal
-    191  f3b0		       00		      .byte.b	%00000000	;|
-    192  f3b1		       00		      .byte.b	%00000000	;|
-    193  f3b2		       04		      .byte.b	%00000100	;| X
-    194  f3b3		       04		      .byte.b	%00000100	;| X
-    195  f3b4		       04		      .byte.b	%00000100	;| X
-    196  f3b5		       00		      .byte.b	%00000000	;|
-    197  f3b6		       00		      .byte.b	%00000000	;|
-    198  f3b7		       00		      .byte.b	%00000000	;|
-    199  f3b8		       00		      .byte.b	%00000000	;|
-    200  f3b9		       00		      .byte.b	%00000000	;|
-    201  f3ba		       00		      .byte.b	%00000000	;|
-    202  f3bb		       00		      .byte.b	%00000000	;|
-    203  f3bc		       00		      .byte.b	%00000000	;|
-    204  f3bd		       00		      .byte.b	%00000000	;|
-    205  f3be		       00		      .byte.b	%00000000	;|
-    206  f3bf		       00		      .byte.b	%00000000	;|
-    207  f3c0							; star
-    208  f3c0		       00		      .byte.b	%00000000	;|
-    209  f3c1		       00		      .byte.b	%00000000	;|
-    210  f3c2		       0a		      .byte.b	%00001010	;|x x
-    211  f3c3		       0a		      .byte.b	%00001010	;|x x
-    212  f3c4		       0a		      .byte.b	%00001010	;|x x
-    213  f3c5		       04		      .byte.b	%00000100	;| x
-    214  f3c6		       04		      .byte.b	%00000100	;| x
-    215  f3c7		       0e		      .byte.b	%00001110	;|xxx
-    216  f3c8		       0e		      .byte.b	%00001110	;|xxx
-    217  f3c9		       04		      .byte.b	%00000100	;| x
-    218  f3ca		       0a		      .byte.b	%00001010	;| x
-    219  f3cb		       0a		      .byte.b	%00001010	;|x x
-    220  f3cc		       0a		      .byte.b	%00001010	;|x x
-    221  f3cd		       00		      .byte.b	%00000000	;|x x
-    222  f3ce		       00		      .byte.b	%00000000	;|
-    223  f3cf		       00		      .byte.b	%00000000	;|
-------- FILE cart.asm
-------- FILE digitTableLeft.h LEVEL 2 PASS 2
-      0  f3d0					      include	"digitTableLeft.h"
+      0  f354					      include	"digitTableRight.h"
       1  f400		       00 00 00 00*	      align	256
-      2  f400				   digitTableLeft
+      2  f400				   digitTableRight
       3  f400							; 0
       4  f400		       00		      .byte.b	%00000000	;|
       5  f401		       00		      .byte.b	%00000000	;|
-      6  f402		       40		      .byte.b	%01000000	;| X
-      7  f403		       40		      .byte.b	%01000000	;| X
-      8  f404		       e0		      .byte.b	%11100000	;|XXX
-      9  f405		       a0		      .byte.b	%10100000	;|X X
-     10  f406		       a0		      .byte.b	%10100000	;|X X
-     11  f407		       a0		      .byte.b	%10100000	;|X X
-     12  f408		       a0		      .byte.b	%10100000	;|X X
-     13  f409		       a0		      .byte.b	%10100000	;|X X
-     14  f40a		       a0		      .byte.b	%10100000	;|X X
-     15  f40b		       e0		      .byte.b	%11100000	;|XXX
-     16  f40c		       40		      .byte.b	%01000000	;| X
-     17  f40d		       40		      .byte.b	%01000000	;| X
+      6  f402		       04		      .byte.b	%00000100	;| X
+      7  f403		       04		      .byte.b	%00000100	;| X
+      8  f404		       0e		      .byte.b	%00001110	;|XXX
+      9  f405		       0a		      .byte.b	%00001010	;|X X
+     10  f406		       0a		      .byte.b	%00001010	;|X X
+     11  f407		       0a		      .byte.b	%00001010	;|X X
+     12  f408		       0a		      .byte.b	%00001010	;|X X
+     13  f409		       0a		      .byte.b	%00001010	;|X X
+     14  f40a		       0a		      .byte.b	%00001010	;|X X
+     15  f40b		       0e		      .byte.b	%00001110	;|XXX
+     16  f40c		       04		      .byte.b	%00000100	;| X
+     17  f40d		       04		      .byte.b	%00000100	;| X
      18  f40e		       00		      .byte.b	%00000000	;|
      19  f40f		       00		      .byte.b	%00000000	;|
      20  f410							; 1
      21  f410		       00		      .byte.b	%00000000	;|
      22  f411		       00		      .byte.b	%00000000	;|
-     23  f412		       e0		      .byte.b	%11100000	;|XXX
-     24  f413		       e0		      .byte.b	%11100000	;|XXX
-     25  f414		       e0		      .byte.b	%11100000	;|XXX
-     26  f415		       40		      .byte.b	%01000000	;| X
-     27  f416		       40		      .byte.b	%01000000	;| X
-     28  f417		       40		      .byte.b	%01000000	;| X
-     29  f418		       40		      .byte.b	%01000000	;| X
-     30  f419		       40		      .byte.b	%01000000	;| X
-     31  f41a		       40		      .byte.b	%01000000	;| X
-     32  f41b		       c0		      .byte.b	%11000000	;|XX
-     33  f41c		       c0		      .byte.b	%11000000	;|XX
-     34  f41d		       40		      .byte.b	%01000000	;| X
+     23  f412		       0e		      .byte.b	%00001110	;|XXX
+     24  f413		       0e		      .byte.b	%00001110	;|XXX
+     25  f414		       0e		      .byte.b	%00001110	;|XXX
+     26  f415		       04		      .byte.b	%00000100	;| X
+     27  f416		       04		      .byte.b	%00000100	;| X
+     28  f417		       04		      .byte.b	%00000100	;| X
+     29  f418		       04		      .byte.b	%00000100	;| X
+     30  f419		       04		      .byte.b	%00000100	;| X
+     31  f41a		       04		      .byte.b	%00000100	;| X
+     32  f41b		       0c		      .byte.b	%00001100	;|XX
+     33  f41c		       0c		      .byte.b	%00001100	;|XX
+     34  f41d		       04		      .byte.b	%00000100	;| X
      35  f41e		       00		      .byte.b	%00000000	;|
      36  f41f		       00		      .byte.b	%00000000	;|
      37  f420							; 2
      38  f420		       00		      .byte.b	%00000000	;|
      39  f421		       00		      .byte.b	%00000000	;|
-     40  f422		       e0		      .byte.b	%11100000	;|XXX
-     41  f423		       e0		      .byte.b	%11100000	;|XXX
-     42  f424		       80		      .byte.b	%10000000	;|X
-     43  f425		       80		      .byte.b	%10000000	;|X
-     44  f426		       c0		      .byte.b	%11000000	;|XX
-     45  f427		       60		      .byte.b	%01100000	;| XX
-     46  f428		       60		      .byte.b	%01100000	;| XX
-     47  f429		       20		      .byte.b	%00100000	;|  X
-     48  f42a		       a0		      .byte.b	%10100000	;|X X
-     49  f42b		       e0		      .byte.b	%11100000	;|XXX
-     50  f42c		       e0		      .byte.b	%11100000	;|XXX
-     51  f42d		       40		      .byte.b	%01000000	;| X
+     40  f422		       0e		      .byte.b	%00001110	;|XXX
+     41  f423		       0e		      .byte.b	%00001110	;|XXX
+     42  f424		       08		      .byte.b	%00001000	;|X
+     43  f425		       08		      .byte.b	%00001000	;|X
+     44  f426		       0c		      .byte.b	%00001100	;|XX
+     45  f427		       06		      .byte.b	%00000110	;| XX
+     46  f428		       06		      .byte.b	%00000110	;| XX
+     47  f429		       02		      .byte.b	%00000010	;|  X
+     48  f42a		       0a		      .byte.b	%00001010	;|X X
+     49  f42b		       0e		      .byte.b	%00001110	;|XXX
+     50  f42c		       0e		      .byte.b	%00001110	;|XXX
+     51  f42d		       04		      .byte.b	%00000100	;| X
      52  f42e		       00		      .byte.b	%00000000	;|
      53  f42f		       00		      .byte.b	%00000000	;|
      54  f430							; 3
      55  f430		       00		      .byte.b	%00000000	;|
      56  f431		       00		      .byte.b	%00000000	;|
-     57  f432		       40		      .byte.b	%01000000	;| X
-     58  f433		       40		      .byte.b	%01000000	;| X
-     59  f434		       e0		      .byte.b	%11100000	;|XXX
-     60  f435		       a0		      .byte.b	%10100000	;|X X
-     61  f436		       20		      .byte.b	%00100000	;|  X
-     62  f437		       40		      .byte.b	%01000000	;| X
-     63  f438		       60		      .byte.b	%01100000	;| XX
-     64  f439		       20		      .byte.b	%00100000	;|  X
-     65  f43a		       a0		      .byte.b	%10100000	;|X X
-     66  f43b		       e0		      .byte.b	%11100000	;|XXX
-     67  f43c		       40		      .byte.b	%01000000	;| X
-     68  f43d		       40		      .byte.b	%01000000	;| X
+     57  f432		       04		      .byte.b	%00000100	;| X
+     58  f433		       04		      .byte.b	%00000100	;| X
+     59  f434		       0e		      .byte.b	%00001110	;|XXX
+     60  f435		       0a		      .byte.b	%00001010	;|X X
+     61  f436		       02		      .byte.b	%00000010	;|  X
+     62  f437		       04		      .byte.b	%00000100	;| X
+     63  f438		       06		      .byte.b	%00000110	;| XX
+     64  f439		       02		      .byte.b	%00000010	;|  X
+     65  f43a		       0a		      .byte.b	%00001010	;|X X
+     66  f43b		       0e		      .byte.b	%00001110	;|XXX
+     67  f43c		       04		      .byte.b	%00000100	;| X
+     68  f43d		       04		      .byte.b	%00000100	;| X
      69  f43e		       00		      .byte.b	%00000000	;|
      70  f43f		       00		      .byte.b	%00000000	;|
      71  f440							; 4
      72  f440		       00		      .byte.b	%00000000	;|
      73  f441		       00		      .byte.b	%00000000	;|
-     74  f442		       20		      .byte.b	%00100000	;|  X
-     75  f443		       20		      .byte.b	%00100000	;|  X
-     76  f444		       20		      .byte.b	%00100000	;|  X
-     77  f445		       20		      .byte.b	%00100000	;|  X
-     78  f446		       e0		      .byte.b	%11100000	;|XXX
-     79  f447		       e0		      .byte.b	%11100000	;|XXX
-     80  f448		       e0		      .byte.b	%11100000	;|XXX
-     81  f449		       a0		      .byte.b	%10100000	;|X X
-     82  f44a		       a0		      .byte.b	%10100000	;|X X
-     83  f44b		       a0		      .byte.b	%10100000	;|X X
-     84  f44c		       a0		      .byte.b	%10100000	;|X X
-     85  f44d		       a0		      .byte.b	%10100000	;|X X
+     74  f442		       02		      .byte.b	%00000010	;|  X
+     75  f443		       02		      .byte.b	%00000010	;|  X
+     76  f444		       02		      .byte.b	%00000010	;|  X
+     77  f445		       02		      .byte.b	%00000010	;|  X
+     78  f446		       0e		      .byte.b	%00001110	;|XXX
+     79  f447		       0e		      .byte.b	%00001110	;|XXX
+     80  f448		       0e		      .byte.b	%00001110	;|XXX
+     81  f449		       0a		      .byte.b	%00001010	;|X X
+     82  f44a		       0a		      .byte.b	%00001010	;|X X
+     83  f44b		       0a		      .byte.b	%00001010	;|X X
+     84  f44c		       0a		      .byte.b	%00001010	;|X X
+     85  f44d		       0a		      .byte.b	%00001010	;|X X
      86  f44e		       00		      .byte.b	%00000000	;|
      87  f44f		       00		      .byte.b	%00000000	;|
      88  f450							; 5
      89  f450		       00		      .byte.b	%00000000	;|
      90  f451		       00		      .byte.b	%00000000	;|
-     91  f452		       40		      .byte.b	%01000000	;| X
-     92  f453		       e0		      .byte.b	%11100000	;|XXX
-     93  f454		       a0		      .byte.b	%10100000	;|X X
-     94  f455		       20		      .byte.b	%00100000	;|  X
-     95  f456		       20		      .byte.b	%00100000	;|  X
-     96  f457		       60		      .byte.b	%01100000	;| XX
-     97  f458		       c0		      .byte.b	%11000000	;|XX
-     98  f459		       c0		      .byte.b	%11000000	;|XX
-     99  f45a		       80		      .byte.b	%10000000	;|X
-    100  f45b		       80		      .byte.b	%10000000	;|X
-    101  f45c		       e0		      .byte.b	%11100000	;|XXX
-    102  f45d		       e0		      .byte.b	%11100000	;|XXX
+     91  f452		       04		      .byte.b	%00000100	;| X
+     92  f453		       0e		      .byte.b	%00001110	;|XXX
+     93  f454		       0a		      .byte.b	%00001010	;|X X
+     94  f455		       02		      .byte.b	%00000010	;|  X
+     95  f456		       02		      .byte.b	%00000010	;|  X
+     96  f457		       06		      .byte.b	%00000110	;| XX
+     97  f458		       0c		      .byte.b	%00001100	;|XX
+     98  f459		       0c		      .byte.b	%00001100	;|XX
+     99  f45a		       08		      .byte.b	%00001000	;|X
+    100  f45b		       08		      .byte.b	%00001000	;|X
+    101  f45c		       0e		      .byte.b	%00001110	;|XXX
+    102  f45d		       0e		      .byte.b	%00001110	;|XXX
     103  f45e		       00		      .byte.b	%00000000	;|
     104  f45f		       00		      .byte.b	%00000000	;|
     105  f460							; 6
     106  f460		       00		      .byte.b	%00000000	;|
     107  f461		       00		      .byte.b	%00000000	;|
-    108  f462		       40		      .byte.b	%01000000	;| X
-    109  f463		       40		      .byte.b	%01000000	;| X
-    110  f464		       e0		      .byte.b	%11100000	;|XXX
-    111  f465		       a0		      .byte.b	%10100000	;|X X
-    112  f466		       a0		      .byte.b	%10100000	;|X X
-    113  f467		       e0		      .byte.b	%11100000	;|XXX
-    114  f468		       c0		      .byte.b	%11000000	;|XX
-    115  f469		       80		      .byte.b	%10000000	;|X
-    116  f46a		       80		      .byte.b	%10000000	;|X
-    117  f46b		       80		      .byte.b	%10000000	;|X
-    118  f46c		       e0		      .byte.b	%11100000	;|XXX
-    119  f46d		       60		      .byte.b	%01100000	;| XX
+    108  f462		       04		      .byte.b	%00000100	;| X
+    109  f463		       04		      .byte.b	%00000100	;| X
+    110  f464		       0e		      .byte.b	%00001110	;|XXX
+    111  f465		       0a		      .byte.b	%00001010	;|X X
+    112  f466		       0a		      .byte.b	%00001010	;|X X
+    113  f467		       0e		      .byte.b	%00001110	;|XXX
+    114  f468		       0c		      .byte.b	%00001100	;|XX
+    115  f469		       08		      .byte.b	%00001000	;|X
+    116  f46a		       08		      .byte.b	%00001000	;|X
+    117  f46b		       08		      .byte.b	%00001000	;|X
+    118  f46c		       0e		      .byte.b	%00001110	;|XXX
+    119  f46d		       06		      .byte.b	%00000110	;| XX
     120  f46e		       00		      .byte.b	%00000000	;|
     121  f46f		       00		      .byte.b	%00000000	;|
     122  f470							; 7
     123  f470		       00		      .byte.b	%00000000	;|
     124  f471		       00		      .byte.b	%00000000	;|
-    125  f472		       80		      .byte.b	%10000000	;|X
-    126  f473		       80		      .byte.b	%10000000	;|X
-    127  f474		       80		      .byte.b	%10000000	;|X
-    128  f475		       40		      .byte.b	%01000000	;| X
-    129  f476		       40		      .byte.b	%01000000	;| X
-    130  f477		       40		      .byte.b	%01000000	;| X
-    131  f478		       60		      .byte.b	%01100000	;| XX
-    132  f479		       20		      .byte.b	%00100000	;|  X
-    133  f47a		       20		      .byte.b	%00100000	;|  X
-    134  f47b		       a0		      .byte.b	%10100000	;|X X
-    135  f47c		       e0		      .byte.b	%11100000	;|XXX
-    136  f47d		       e0		      .byte.b	%11100000	;|XXX
+    125  f472		       08		      .byte.b	%00001000	;|X
+    126  f473		       08		      .byte.b	%00001000	;|X
+    127  f474		       08		      .byte.b	%00001000	;|X
+    128  f475		       04		      .byte.b	%00000100	;| X
+    129  f476		       04		      .byte.b	%00000100	;| X
+    130  f477		       04		      .byte.b	%00000100	;| X
+    131  f478		       06		      .byte.b	%00000110	;| XX
+    132  f479		       02		      .byte.b	%00000010	;|  X
+    133  f47a		       02		      .byte.b	%00000010	;|  X
+    134  f47b		       0a		      .byte.b	%00001010	;|X X
+    135  f47c		       0e		      .byte.b	%00001110	;|XXX
+    136  f47d		       0e		      .byte.b	%00001110	;|XXX
     137  f47e		       00		      .byte.b	%00000000	;|
     138  f47f		       00		      .byte.b	%00000000	;|
     139  f480							; 8
     140  f480		       00		      .byte.b	%00000000	;|
     141  f481		       00		      .byte.b	%00000000	;|
-    142  f482		       40		      .byte.b	%01000000	;| X
-    143  f483		       e0		      .byte.b	%11100000	;|XXX
-    144  f484		       a0		      .byte.b	%10100000	;|X X
-    145  f485		       a0		      .byte.b	%10100000	;|X X
-    146  f486		       a0		      .byte.b	%10100000	;|X X
-    147  f487		       40		      .byte.b	%01000000	;| X
-    148  f488		       40		      .byte.b	%01000000	;| X
-    149  f489		       a0		      .byte.b	%10100000	;|X X
-    150  f48a		       a0		      .byte.b	%10100000	;|X X
-    151  f48b		       a0		      .byte.b	%10100000	;|X X
-    152  f48c		       e0		      .byte.b	%11100000	;|XXX
-    153  f48d		       40		      .byte.b	%01000000	;| X
+    142  f482		       04		      .byte.b	%00000100	;| X
+    143  f483		       0e		      .byte.b	%00001110	;|XXX
+    144  f484		       0a		      .byte.b	%00001010	;|X X
+    145  f485		       0a		      .byte.b	%00001010	;|X X
+    146  f486		       0a		      .byte.b	%00001010	;|X X
+    147  f487		       04		      .byte.b	%00000100	;| X
+    148  f488		       04		      .byte.b	%00000100	;| X
+    149  f489		       0a		      .byte.b	%00001010	;|X X
+    150  f48a		       0a		      .byte.b	%00001010	;|X X
+    151  f48b		       0a		      .byte.b	%00001010	;|X X
+    152  f48c		       0e		      .byte.b	%00001110	;|XXX
+    153  f48d		       04		      .byte.b	%00000100	;| X
     154  f48e		       00		      .byte.b	%00000000	;|
     155  f48f		       00		      .byte.b	%00000000	;|
     156  f490							; 9
     157  f490		       00		      .byte.b	%00000000	;|
     158  f491		       00		      .byte.b	%00000000	;|
-    159  f492		       c0		      .byte.b	%11000000	;|XX
-    160  f493		       e0		      .byte.b	%11100000	;|XXX
-    161  f494		       20		      .byte.b	%00100000	;|  X
-    162  f495		       20		      .byte.b	%00100000	;|  X
-    163  f496		       60		      .byte.b	%01100000	;| XX
-    164  f497		       e0		      .byte.b	%11100000	;|XXX
-    165  f498		       a0		      .byte.b	%10100000	;|X X
-    166  f499		       a0		      .byte.b	%10100000	;|X X
-    167  f49a		       a0		      .byte.b	%10100000	;|X X
-    168  f49b		       e0		      .byte.b	%11100000	;|XXX
-    169  f49c		       c0		      .byte.b	%11000000	;|XX
-    170  f49d		       40		      .byte.b	%01000000	;| X
+    159  f492		       0c		      .byte.b	%00001100	;|XX
+    160  f493		       0e		      .byte.b	%00001110	;|XXX
+    161  f494		       02		      .byte.b	%00000010	;|  X
+    162  f495		       02		      .byte.b	%00000010	;|  X
+    163  f496		       06		      .byte.b	%00000110	;| XX
+    164  f497		       0e		      .byte.b	%00001110	;|XXX
+    165  f498		       0a		      .byte.b	%00001010	;|X X
+    166  f499		       0a		      .byte.b	%00001010	;|X X
+    167  f49a		       0a		      .byte.b	%00001010	;|X X
+    168  f49b		       0e		      .byte.b	%00001110	;|XXX
+    169  f49c		       0c		      .byte.b	%00001100	;|XX
+    170  f49d		       04		      .byte.b	%00000100	;| X
     171  f49e		       00		      .byte.b	%00000000	;|
     172  f49f		       00		      .byte.b	%00000000	;|
     173  f4a0							; blank
@@ -1378,9 +1186,9 @@
     190  f4b0							; decimal
     191  f4b0		       00		      .byte.b	%00000000	;|
     192  f4b1		       00		      .byte.b	%00000000	;|
-    193  f4b2		       40		      .byte.b	%01000000	;| X
-    194  f4b3		       40		      .byte.b	%01000000	;| X
-    195  f4b4		       40		      .byte.b	%01000000	;| X
+    193  f4b2		       04		      .byte.b	%00000100	;| X
+    194  f4b3		       04		      .byte.b	%00000100	;| X
+    195  f4b4		       04		      .byte.b	%00000100	;| X
     196  f4b5		       00		      .byte.b	%00000000	;|
     197  f4b6		       00		      .byte.b	%00000000	;|
     198  f4b7		       00		      .byte.b	%00000000	;|
@@ -1395,193 +1203,193 @@
     207  f4c0							; star
     208  f4c0		       00		      .byte.b	%00000000	;|
     209  f4c1		       00		      .byte.b	%00000000	;|
-    210  f4c2		       a0		      .byte.b	%10100000	;|x x
-    211  f4c3		       a0		      .byte.b	%10100000	;|x x
-    212  f4c4		       a0		      .byte.b	%10100000	;|x x
-    213  f4c5		       40		      .byte.b	%01000000	;| x
-    214  f4c6		       40		      .byte.b	%01000000	;| x
-    215  f4c7		       e0		      .byte.b	%11100000	;|xxx
-    216  f4c8		       e0		      .byte.b	%11100000	;|xxx
-    217  f4c9		       40		      .byte.b	%01000000	;| x
-    218  f4ca		       40		      .byte.b	%01000000	;| x
-    219  f4cb		       a0		      .byte.b	%10100000	;|x x
-    220  f4cc		       a0		      .byte.b	%10100000	;|x x
-    221  f4cd		       a0		      .byte.b	%10100000	;|x x
+    210  f4c2		       0a		      .byte.b	%00001010	;|x x
+    211  f4c3		       0a		      .byte.b	%00001010	;|x x
+    212  f4c4		       0a		      .byte.b	%00001010	;|x x
+    213  f4c5		       04		      .byte.b	%00000100	;| x
+    214  f4c6		       04		      .byte.b	%00000100	;| x
+    215  f4c7		       0e		      .byte.b	%00001110	;|xxx
+    216  f4c8		       0e		      .byte.b	%00001110	;|xxx
+    217  f4c9		       04		      .byte.b	%00000100	;| x
+    218  f4ca		       0a		      .byte.b	%00001010	;| x
+    219  f4cb		       0a		      .byte.b	%00001010	;|x x
+    220  f4cc		       0a		      .byte.b	%00001010	;|x x
+    221  f4cd		       00		      .byte.b	%00000000	;|x x
     222  f4ce		       00		      .byte.b	%00000000	;|
     223  f4cf		       00		      .byte.b	%00000000	;|
 ------- FILE cart.asm
-------- FILE digitTableRightRev.h LEVEL 2 PASS 2
-      0  f4d0					      include	"digitTableRightRev.h"
+------- FILE digitTableLeft.h LEVEL 2 PASS 2
+      0  f4d0					      include	"digitTableLeft.h"
       1  f500		       00 00 00 00*	      align	256
-      2  f500				   digitTableRightRev
+      2  f500				   digitTableLeft
       3  f500							; 0
       4  f500		       00		      .byte.b	%00000000	;|
       5  f501		       00		      .byte.b	%00000000	;|
-      6  f502		       02		      .byte.b	%00000010	;| X
-      7  f503		       02		      .byte.b	%00000010	;| X
-      8  f504		       07		      .byte.b	%00000111	;|XXX
-      9  f505		       05		      .byte.b	%00000101	;|X X
-     10  f506		       05		      .byte.b	%00000101	;|X X
-     11  f507		       05		      .byte.b	%00000101	;|X X
-     12  f508		       05		      .byte.b	%00000101	;|X X
-     13  f509		       05		      .byte.b	%00000101	;|X X
-     14  f50a		       05		      .byte.b	%00000101	;|X X
-     15  f50b		       07		      .byte.b	%00000111	;|XXX
-     16  f50c		       02		      .byte.b	%00000010	;| X
-     17  f50d		       02		      .byte.b	%00000010	;| X
+      6  f502		       40		      .byte.b	%01000000	;| X
+      7  f503		       40		      .byte.b	%01000000	;| X
+      8  f504		       e0		      .byte.b	%11100000	;|XXX
+      9  f505		       a0		      .byte.b	%10100000	;|X X
+     10  f506		       a0		      .byte.b	%10100000	;|X X
+     11  f507		       a0		      .byte.b	%10100000	;|X X
+     12  f508		       a0		      .byte.b	%10100000	;|X X
+     13  f509		       a0		      .byte.b	%10100000	;|X X
+     14  f50a		       a0		      .byte.b	%10100000	;|X X
+     15  f50b		       e0		      .byte.b	%11100000	;|XXX
+     16  f50c		       40		      .byte.b	%01000000	;| X
+     17  f50d		       40		      .byte.b	%01000000	;| X
      18  f50e		       00		      .byte.b	%00000000	;|
      19  f50f		       00		      .byte.b	%00000000	;|
      20  f510							; 1
      21  f510		       00		      .byte.b	%00000000	;|
      22  f511		       00		      .byte.b	%00000000	;|
-     23  f512		       07		      .byte.b	%00000111	;|XXX
-     24  f513		       07		      .byte.b	%00000111	;|XXX
-     25  f514		       07		      .byte.b	%00000111	;|XXX
-     26  f515		       02		      .byte.b	%00000010	;| X
-     27  f516		       02		      .byte.b	%00000010	;| X
-     28  f517		       02		      .byte.b	%00000010	;| X
-     29  f518		       02		      .byte.b	%00000010	;| X
-     30  f519		       02		      .byte.b	%00000010	;| X
-     31  f51a		       02		      .byte.b	%00000010	;| X
-     32  f51b		       03		      .byte.b	%00000011	;|XX
-     33  f51c		       03		      .byte.b	%00000011	;|XX
-     34  f51d		       02		      .byte.b	%00000010	;| X
+     23  f512		       e0		      .byte.b	%11100000	;|XXX
+     24  f513		       e0		      .byte.b	%11100000	;|XXX
+     25  f514		       e0		      .byte.b	%11100000	;|XXX
+     26  f515		       40		      .byte.b	%01000000	;| X
+     27  f516		       40		      .byte.b	%01000000	;| X
+     28  f517		       40		      .byte.b	%01000000	;| X
+     29  f518		       40		      .byte.b	%01000000	;| X
+     30  f519		       40		      .byte.b	%01000000	;| X
+     31  f51a		       40		      .byte.b	%01000000	;| X
+     32  f51b		       c0		      .byte.b	%11000000	;|XX
+     33  f51c		       c0		      .byte.b	%11000000	;|XX
+     34  f51d		       40		      .byte.b	%01000000	;| X
      35  f51e		       00		      .byte.b	%00000000	;|
      36  f51f		       00		      .byte.b	%00000000	;|
      37  f520							; 2
      38  f520		       00		      .byte.b	%00000000	;|
      39  f521		       00		      .byte.b	%00000000	;|
-     40  f522		       07		      .byte.b	%00000111	;|XXX
-     41  f523		       07		      .byte.b	%00000111	;|XXX
-     42  f524		       01		      .byte.b	%00000001	;|X
-     43  f525		       01		      .byte.b	%00000001	;|X
-     44  f526		       03		      .byte.b	%00000011	;|XX
-     45  f527		       06		      .byte.b	%00000110	;| XX
-     46  f528		       06		      .byte.b	%00000110	;| XX
-     47  f529		       04		      .byte.b	%00000100	;|  X
-     48  f52a		       05		      .byte.b	%00000101	;|X X
-     49  f52b		       07		      .byte.b	%00000111	;|XXX
-     50  f52c		       07		      .byte.b	%00000111	;|XXX
-     51  f52d		       02		      .byte.b	%00000010	;| X
+     40  f522		       e0		      .byte.b	%11100000	;|XXX
+     41  f523		       e0		      .byte.b	%11100000	;|XXX
+     42  f524		       80		      .byte.b	%10000000	;|X
+     43  f525		       80		      .byte.b	%10000000	;|X
+     44  f526		       c0		      .byte.b	%11000000	;|XX
+     45  f527		       60		      .byte.b	%01100000	;| XX
+     46  f528		       60		      .byte.b	%01100000	;| XX
+     47  f529		       20		      .byte.b	%00100000	;|  X
+     48  f52a		       a0		      .byte.b	%10100000	;|X X
+     49  f52b		       e0		      .byte.b	%11100000	;|XXX
+     50  f52c		       e0		      .byte.b	%11100000	;|XXX
+     51  f52d		       40		      .byte.b	%01000000	;| X
      52  f52e		       00		      .byte.b	%00000000	;|
      53  f52f		       00		      .byte.b	%00000000	;|
      54  f530							; 3
      55  f530		       00		      .byte.b	%00000000	;|
      56  f531		       00		      .byte.b	%00000000	;|
-     57  f532		       02		      .byte.b	%00000010	;| X
-     58  f533		       02		      .byte.b	%00000010	;| X
-     59  f534		       07		      .byte.b	%00000111	;|XXX
-     60  f535		       05		      .byte.b	%00000101	;|X X
-     61  f536		       04		      .byte.b	%00000100	;|  X
-     62  f537		       02		      .byte.b	%00000010	;| X
-     63  f538		       06		      .byte.b	%00000110	;| XX
-     64  f539		       04		      .byte.b	%00000100	;|  X
-     65  f53a		       05		      .byte.b	%00000101	;|X X
-     66  f53b		       07		      .byte.b	%00000111	;|XXX
-     67  f53c		       02		      .byte.b	%00000010	;| X
-     68  f53d		       02		      .byte.b	%00000010	;| X
+     57  f532		       40		      .byte.b	%01000000	;| X
+     58  f533		       40		      .byte.b	%01000000	;| X
+     59  f534		       e0		      .byte.b	%11100000	;|XXX
+     60  f535		       a0		      .byte.b	%10100000	;|X X
+     61  f536		       20		      .byte.b	%00100000	;|  X
+     62  f537		       40		      .byte.b	%01000000	;| X
+     63  f538		       60		      .byte.b	%01100000	;| XX
+     64  f539		       20		      .byte.b	%00100000	;|  X
+     65  f53a		       a0		      .byte.b	%10100000	;|X X
+     66  f53b		       e0		      .byte.b	%11100000	;|XXX
+     67  f53c		       40		      .byte.b	%01000000	;| X
+     68  f53d		       40		      .byte.b	%01000000	;| X
      69  f53e		       00		      .byte.b	%00000000	;|
      70  f53f		       00		      .byte.b	%00000000	;|
      71  f540							; 4
      72  f540		       00		      .byte.b	%00000000	;|
      73  f541		       00		      .byte.b	%00000000	;|
-     74  f542		       04		      .byte.b	%00000100	;|  X
-     75  f543		       04		      .byte.b	%00000100	;|  X
-     76  f544		       04		      .byte.b	%00000100	;|  X
-     77  f545		       04		      .byte.b	%00000100	;|  X
-     78  f546		       07		      .byte.b	%00000111	;|XXX
-     79  f547		       07		      .byte.b	%00000111	;|XXX
-     80  f548		       07		      .byte.b	%00000111	;|XXX
-     81  f549		       05		      .byte.b	%00000101	;|X X
-     82  f54a		       05		      .byte.b	%00000101	;|X X
-     83  f54b		       05		      .byte.b	%00000101	;|X X
-     84  f54c		       05		      .byte.b	%00000101	;|X X
-     85  f54d		       05		      .byte.b	%00000101	;|X X
+     74  f542		       20		      .byte.b	%00100000	;|  X
+     75  f543		       20		      .byte.b	%00100000	;|  X
+     76  f544		       20		      .byte.b	%00100000	;|  X
+     77  f545		       20		      .byte.b	%00100000	;|  X
+     78  f546		       e0		      .byte.b	%11100000	;|XXX
+     79  f547		       e0		      .byte.b	%11100000	;|XXX
+     80  f548		       e0		      .byte.b	%11100000	;|XXX
+     81  f549		       a0		      .byte.b	%10100000	;|X X
+     82  f54a		       a0		      .byte.b	%10100000	;|X X
+     83  f54b		       a0		      .byte.b	%10100000	;|X X
+     84  f54c		       a0		      .byte.b	%10100000	;|X X
+     85  f54d		       a0		      .byte.b	%10100000	;|X X
      86  f54e		       00		      .byte.b	%00000000	;|
      87  f54f		       00		      .byte.b	%00000000	;|
      88  f550							; 5
      89  f550		       00		      .byte.b	%00000000	;|
      90  f551		       00		      .byte.b	%00000000	;|
-     91  f552		       02		      .byte.b	%00000010	;| X
-     92  f553		       07		      .byte.b	%00000111	;|XXX
-     93  f554		       05		      .byte.b	%00000101	;|X X
-     94  f555		       04		      .byte.b	%00000100	;|  X
-     95  f556		       04		      .byte.b	%00000100	;|  X
-     96  f557		       06		      .byte.b	%00000110	;| XX
-     97  f558		       03		      .byte.b	%00000011	;|XX
-     98  f559		       03		      .byte.b	%00000011	;|XX
-     99  f55a		       01		      .byte.b	%00000001	;|X
-    100  f55b		       01		      .byte.b	%00000001	;|X
-    101  f55c		       07		      .byte.b	%00000111	;|XXX
-    102  f55d		       07		      .byte.b	%00000111	;|XXX
+     91  f552		       40		      .byte.b	%01000000	;| X
+     92  f553		       e0		      .byte.b	%11100000	;|XXX
+     93  f554		       a0		      .byte.b	%10100000	;|X X
+     94  f555		       20		      .byte.b	%00100000	;|  X
+     95  f556		       20		      .byte.b	%00100000	;|  X
+     96  f557		       60		      .byte.b	%01100000	;| XX
+     97  f558		       c0		      .byte.b	%11000000	;|XX
+     98  f559		       c0		      .byte.b	%11000000	;|XX
+     99  f55a		       80		      .byte.b	%10000000	;|X
+    100  f55b		       80		      .byte.b	%10000000	;|X
+    101  f55c		       e0		      .byte.b	%11100000	;|XXX
+    102  f55d		       e0		      .byte.b	%11100000	;|XXX
     103  f55e		       00		      .byte.b	%00000000	;|
     104  f55f		       00		      .byte.b	%00000000	;|
     105  f560							; 6
     106  f560		       00		      .byte.b	%00000000	;|
     107  f561		       00		      .byte.b	%00000000	;|
-    108  f562		       02		      .byte.b	%00000010	;| X
-    109  f563		       02		      .byte.b	%00000010	;| X
-    110  f564		       07		      .byte.b	%00000111	;|XXX
-    111  f565		       05		      .byte.b	%00000101	;|X X
-    112  f566		       05		      .byte.b	%00000101	;|X X
-    113  f567		       07		      .byte.b	%00000111	;|XXX
-    114  f568		       03		      .byte.b	%00000011	;|XX
-    115  f569		       01		      .byte.b	%00000001	;|X
-    116  f56a		       01		      .byte.b	%00000001	;|X
-    117  f56b		       01		      .byte.b	%00000001	;|X
-    118  f56c		       07		      .byte.b	%00000111	;|XXX
-    119  f56d		       06		      .byte.b	%00000110	;| XX
+    108  f562		       40		      .byte.b	%01000000	;| X
+    109  f563		       40		      .byte.b	%01000000	;| X
+    110  f564		       e0		      .byte.b	%11100000	;|XXX
+    111  f565		       a0		      .byte.b	%10100000	;|X X
+    112  f566		       a0		      .byte.b	%10100000	;|X X
+    113  f567		       e0		      .byte.b	%11100000	;|XXX
+    114  f568		       c0		      .byte.b	%11000000	;|XX
+    115  f569		       80		      .byte.b	%10000000	;|X
+    116  f56a		       80		      .byte.b	%10000000	;|X
+    117  f56b		       80		      .byte.b	%10000000	;|X
+    118  f56c		       e0		      .byte.b	%11100000	;|XXX
+    119  f56d		       60		      .byte.b	%01100000	;| XX
     120  f56e		       00		      .byte.b	%00000000	;|
     121  f56f		       00		      .byte.b	%00000000	;|
     122  f570							; 7
     123  f570		       00		      .byte.b	%00000000	;|
     124  f571		       00		      .byte.b	%00000000	;|
-    125  f572		       01		      .byte.b	%00000001	;|X
-    126  f573		       01		      .byte.b	%00000001	;|X
-    127  f574		       01		      .byte.b	%00000001	;|X
-    128  f575		       02		      .byte.b	%00000010	;| X
-    129  f576		       02		      .byte.b	%00000010	;| X
-    130  f577		       02		      .byte.b	%00000010	;| X
-    131  f578		       06		      .byte.b	%00000110	;| XX
-    132  f579		       04		      .byte.b	%00000100	;|  X
-    133  f57a		       04		      .byte.b	%00000100	;|  X
-    134  f57b		       05		      .byte.b	%00000101	;|X X
-    135  f57c		       07		      .byte.b	%00000111	;|XXX
-    136  f57d		       07		      .byte.b	%00000111	;|XXX
+    125  f572		       80		      .byte.b	%10000000	;|X
+    126  f573		       80		      .byte.b	%10000000	;|X
+    127  f574		       80		      .byte.b	%10000000	;|X
+    128  f575		       40		      .byte.b	%01000000	;| X
+    129  f576		       40		      .byte.b	%01000000	;| X
+    130  f577		       40		      .byte.b	%01000000	;| X
+    131  f578		       60		      .byte.b	%01100000	;| XX
+    132  f579		       20		      .byte.b	%00100000	;|  X
+    133  f57a		       20		      .byte.b	%00100000	;|  X
+    134  f57b		       a0		      .byte.b	%10100000	;|X X
+    135  f57c		       e0		      .byte.b	%11100000	;|XXX
+    136  f57d		       e0		      .byte.b	%11100000	;|XXX
     137  f57e		       00		      .byte.b	%00000000	;|
     138  f57f		       00		      .byte.b	%00000000	;|
     139  f580							; 8
     140  f580		       00		      .byte.b	%00000000	;|
     141  f581		       00		      .byte.b	%00000000	;|
-    142  f582		       02		      .byte.b	%00000010	;| X
-    143  f583		       07		      .byte.b	%00000111	;|XXX
-    144  f584		       05		      .byte.b	%00000101	;|X X
-    145  f585		       05		      .byte.b	%00000101	;|X X
-    146  f586		       05		      .byte.b	%00000101	;|X X
-    147  f587		       02		      .byte.b	%00000010	;| X
-    148  f588		       02		      .byte.b	%00000010	;| X
-    149  f589		       05		      .byte.b	%00000101	;|X X
-    150  f58a		       05		      .byte.b	%00000101	;|X X
-    151  f58b		       05		      .byte.b	%00000101	;|X X
-    152  f58c		       07		      .byte.b	%00000111	;|XXX
-    153  f58d		       02		      .byte.b	%00000010	;| X
+    142  f582		       40		      .byte.b	%01000000	;| X
+    143  f583		       e0		      .byte.b	%11100000	;|XXX
+    144  f584		       a0		      .byte.b	%10100000	;|X X
+    145  f585		       a0		      .byte.b	%10100000	;|X X
+    146  f586		       a0		      .byte.b	%10100000	;|X X
+    147  f587		       40		      .byte.b	%01000000	;| X
+    148  f588		       40		      .byte.b	%01000000	;| X
+    149  f589		       a0		      .byte.b	%10100000	;|X X
+    150  f58a		       a0		      .byte.b	%10100000	;|X X
+    151  f58b		       a0		      .byte.b	%10100000	;|X X
+    152  f58c		       e0		      .byte.b	%11100000	;|XXX
+    153  f58d		       40		      .byte.b	%01000000	;| X
     154  f58e		       00		      .byte.b	%00000000	;|
     155  f58f		       00		      .byte.b	%00000000	;|
     156  f590							; 9
     157  f590		       00		      .byte.b	%00000000	;|
     158  f591		       00		      .byte.b	%00000000	;|
-    159  f592		       03		      .byte.b	%00000011	;|XX
-    160  f593		       07		      .byte.b	%00000111	;|XXX
-    161  f594		       04		      .byte.b	%00000100	;|  X
-    162  f595		       04		      .byte.b	%00000100	;|  X
-    163  f596		       06		      .byte.b	%00000110	;| XX
-    164  f597		       07		      .byte.b	%00000111	;|XXX
-    165  f598		       05		      .byte.b	%00000101	;|X X
-    166  f599		       05		      .byte.b	%00000101	;|X X
-    167  f59a		       05		      .byte.b	%00000101	;|X X
-    168  f59b		       07		      .byte.b	%00000111	;|XXX
-    169  f59c		       03		      .byte.b	%00000011	;|XX
-    170  f59d		       02		      .byte.b	%00000010	;| X
+    159  f592		       c0		      .byte.b	%11000000	;|XX
+    160  f593		       e0		      .byte.b	%11100000	;|XXX
+    161  f594		       20		      .byte.b	%00100000	;|  X
+    162  f595		       20		      .byte.b	%00100000	;|  X
+    163  f596		       60		      .byte.b	%01100000	;| XX
+    164  f597		       e0		      .byte.b	%11100000	;|XXX
+    165  f598		       a0		      .byte.b	%10100000	;|X X
+    166  f599		       a0		      .byte.b	%10100000	;|X X
+    167  f59a		       a0		      .byte.b	%10100000	;|X X
+    168  f59b		       e0		      .byte.b	%11100000	;|XXX
+    169  f59c		       c0		      .byte.b	%11000000	;|XX
+    170  f59d		       40		      .byte.b	%01000000	;| X
     171  f59e		       00		      .byte.b	%00000000	;|
     172  f59f		       00		      .byte.b	%00000000	;|
     173  f5a0							; blank
@@ -1604,9 +1412,9 @@
     190  f5b0							; decimal
     191  f5b0		       00		      .byte.b	%00000000	;|
     192  f5b1		       00		      .byte.b	%00000000	;|
-    193  f5b2		       02		      .byte.b	%00000010	;| X
-    194  f5b3		       02		      .byte.b	%00000010	;| X
-    195  f5b4		       02		      .byte.b	%00000010	;| X
+    193  f5b2		       40		      .byte.b	%01000000	;| X
+    194  f5b3		       40		      .byte.b	%01000000	;| X
+    195  f5b4		       40		      .byte.b	%01000000	;| X
     196  f5b5		       00		      .byte.b	%00000000	;|
     197  f5b6		       00		      .byte.b	%00000000	;|
     198  f5b7		       00		      .byte.b	%00000000	;|
@@ -1621,193 +1429,193 @@
     207  f5c0							; star
     208  f5c0		       00		      .byte.b	%00000000	;|
     209  f5c1		       00		      .byte.b	%00000000	;|
-    210  f5c2		       05		      .byte.b	%00000101	;|x x
-    211  f5c3		       05		      .byte.b	%00000101	;|x x
-    212  f5c4		       05		      .byte.b	%00000101	;|x x
-    213  f5c5		       02		      .byte.b	%00000010	;| x
-    214  f5c6		       02		      .byte.b	%00000010	;| x
-    215  f5c7		       07		      .byte.b	%00000111	;|xxx
-    216  f5c8		       07		      .byte.b	%00000111	;|xxx
-    217  f5c9		       02		      .byte.b	%00000010	;| x
-    218  f5ca		       05		      .byte.b	%00000101	;| x
-    219  f5cb		       05		      .byte.b	%00000101	;|x x
-    220  f5cc		       05		      .byte.b	%00000101	;|x x
-    221  f5cd		       00		      .byte.b	%00000000	;|x x
+    210  f5c2		       a0		      .byte.b	%10100000	;|x x
+    211  f5c3		       a0		      .byte.b	%10100000	;|x x
+    212  f5c4		       a0		      .byte.b	%10100000	;|x x
+    213  f5c5		       40		      .byte.b	%01000000	;| x
+    214  f5c6		       40		      .byte.b	%01000000	;| x
+    215  f5c7		       e0		      .byte.b	%11100000	;|xxx
+    216  f5c8		       e0		      .byte.b	%11100000	;|xxx
+    217  f5c9		       40		      .byte.b	%01000000	;| x
+    218  f5ca		       40		      .byte.b	%01000000	;| x
+    219  f5cb		       a0		      .byte.b	%10100000	;|x x
+    220  f5cc		       a0		      .byte.b	%10100000	;|x x
+    221  f5cd		       a0		      .byte.b	%10100000	;|x x
     222  f5ce		       00		      .byte.b	%00000000	;|
     223  f5cf		       00		      .byte.b	%00000000	;|
 ------- FILE cart.asm
-------- FILE digitTableLeftRev.h LEVEL 2 PASS 2
-      0  f5d0					      include	"digitTableLeftRev.h"
+------- FILE digitTableRightRev.h LEVEL 2 PASS 2
+      0  f5d0					      include	"digitTableRightRev.h"
       1  f600		       00 00 00 00*	      align	256
-      2  f600				   digitTableLeftRev
+      2  f600				   digitTableRightRev
       3  f600							; 0
       4  f600		       00		      .byte.b	%00000000	;|
       5  f601		       00		      .byte.b	%00000000	;|
-      6  f602		       20		      .byte.b	%00100000	;| X
-      7  f603		       20		      .byte.b	%00100000	;| X
-      8  f604		       70		      .byte.b	%01110000	;|XXX
-      9  f605		       50		      .byte.b	%01010000	;|X X
-     10  f606		       50		      .byte.b	%01010000	;|X X
-     11  f607		       50		      .byte.b	%01010000	;|X X
-     12  f608		       50		      .byte.b	%01010000	;|X X
-     13  f609		       50		      .byte.b	%01010000	;|X X
-     14  f60a		       50		      .byte.b	%01010000	;|X X
-     15  f60b		       70		      .byte.b	%01110000	;|XXX
-     16  f60c		       20		      .byte.b	%00100000	;| X
-     17  f60d		       20		      .byte.b	%00100000	;| X
+      6  f602		       02		      .byte.b	%00000010	;| X
+      7  f603		       02		      .byte.b	%00000010	;| X
+      8  f604		       07		      .byte.b	%00000111	;|XXX
+      9  f605		       05		      .byte.b	%00000101	;|X X
+     10  f606		       05		      .byte.b	%00000101	;|X X
+     11  f607		       05		      .byte.b	%00000101	;|X X
+     12  f608		       05		      .byte.b	%00000101	;|X X
+     13  f609		       05		      .byte.b	%00000101	;|X X
+     14  f60a		       05		      .byte.b	%00000101	;|X X
+     15  f60b		       07		      .byte.b	%00000111	;|XXX
+     16  f60c		       02		      .byte.b	%00000010	;| X
+     17  f60d		       02		      .byte.b	%00000010	;| X
      18  f60e		       00		      .byte.b	%00000000	;|
      19  f60f		       00		      .byte.b	%00000000	;|
      20  f610							; 1
      21  f610		       00		      .byte.b	%00000000	;|
      22  f611		       00		      .byte.b	%00000000	;|
-     23  f612		       70		      .byte.b	%01110000	;|XXX
-     24  f613		       70		      .byte.b	%01110000	;|XXX
-     25  f614		       70		      .byte.b	%01110000	;|XXX
-     26  f615		       20		      .byte.b	%00100000	;| X
-     27  f616		       20		      .byte.b	%00100000	;| X
-     28  f617		       20		      .byte.b	%00100000	;| X
-     29  f618		       20		      .byte.b	%00100000	;| X
-     30  f619		       20		      .byte.b	%00100000	;| X
-     31  f61a		       20		      .byte.b	%00100000	;| X
-     32  f61b		       30		      .byte.b	%00110000	;|XX
-     33  f61c		       30		      .byte.b	%00110000	;|XX
-     34  f61d		       20		      .byte.b	%00100000	;| X
+     23  f612		       07		      .byte.b	%00000111	;|XXX
+     24  f613		       07		      .byte.b	%00000111	;|XXX
+     25  f614		       07		      .byte.b	%00000111	;|XXX
+     26  f615		       02		      .byte.b	%00000010	;| X
+     27  f616		       02		      .byte.b	%00000010	;| X
+     28  f617		       02		      .byte.b	%00000010	;| X
+     29  f618		       02		      .byte.b	%00000010	;| X
+     30  f619		       02		      .byte.b	%00000010	;| X
+     31  f61a		       02		      .byte.b	%00000010	;| X
+     32  f61b		       03		      .byte.b	%00000011	;|XX
+     33  f61c		       03		      .byte.b	%00000011	;|XX
+     34  f61d		       02		      .byte.b	%00000010	;| X
      35  f61e		       00		      .byte.b	%00000000	;|
      36  f61f		       00		      .byte.b	%00000000	;|
      37  f620							; 2
      38  f620		       00		      .byte.b	%00000000	;|
      39  f621		       00		      .byte.b	%00000000	;|
-     40  f622		       70		      .byte.b	%01110000	;|XXX
-     41  f623		       70		      .byte.b	%01110000	;|XXX
-     42  f624		       10		      .byte.b	%00010000	;|X
-     43  f625		       10		      .byte.b	%00010000	;|X
-     44  f626		       30		      .byte.b	%00110000	;|XX
-     45  f627		       60		      .byte.b	%01100000	;| XX
-     46  f628		       60		      .byte.b	%01100000	;| XX
-     47  f629		       40		      .byte.b	%01000000	;|  X
-     48  f62a		       50		      .byte.b	%01010000	;|X X
-     49  f62b		       70		      .byte.b	%01110000	;|XXX
-     50  f62c		       70		      .byte.b	%01110000	;|XXX
-     51  f62d		       20		      .byte.b	%00100000	;| X
+     40  f622		       07		      .byte.b	%00000111	;|XXX
+     41  f623		       07		      .byte.b	%00000111	;|XXX
+     42  f624		       01		      .byte.b	%00000001	;|X
+     43  f625		       01		      .byte.b	%00000001	;|X
+     44  f626		       03		      .byte.b	%00000011	;|XX
+     45  f627		       06		      .byte.b	%00000110	;| XX
+     46  f628		       06		      .byte.b	%00000110	;| XX
+     47  f629		       04		      .byte.b	%00000100	;|  X
+     48  f62a		       05		      .byte.b	%00000101	;|X X
+     49  f62b		       07		      .byte.b	%00000111	;|XXX
+     50  f62c		       07		      .byte.b	%00000111	;|XXX
+     51  f62d		       02		      .byte.b	%00000010	;| X
      52  f62e		       00		      .byte.b	%00000000	;|
      53  f62f		       00		      .byte.b	%00000000	;|
      54  f630							; 3
      55  f630		       00		      .byte.b	%00000000	;|
      56  f631		       00		      .byte.b	%00000000	;|
-     57  f632		       20		      .byte.b	%00100000	;| X
-     58  f633		       20		      .byte.b	%00100000	;| X
-     59  f634		       70		      .byte.b	%01110000	;|XXX
-     60  f635		       50		      .byte.b	%01010000	;|X X
-     61  f636		       40		      .byte.b	%01000000	;|  X
-     62  f637		       20		      .byte.b	%00100000	;| X
-     63  f638		       60		      .byte.b	%01100000	;| XX
-     64  f639		       40		      .byte.b	%01000000	;|  X
-     65  f63a		       50		      .byte.b	%01010000	;|X X
-     66  f63b		       70		      .byte.b	%01110000	;|XXX
-     67  f63c		       20		      .byte.b	%00100000	;| X
-     68  f63d		       20		      .byte.b	%00100000	;| X
+     57  f632		       02		      .byte.b	%00000010	;| X
+     58  f633		       02		      .byte.b	%00000010	;| X
+     59  f634		       07		      .byte.b	%00000111	;|XXX
+     60  f635		       05		      .byte.b	%00000101	;|X X
+     61  f636		       04		      .byte.b	%00000100	;|  X
+     62  f637		       02		      .byte.b	%00000010	;| X
+     63  f638		       06		      .byte.b	%00000110	;| XX
+     64  f639		       04		      .byte.b	%00000100	;|  X
+     65  f63a		       05		      .byte.b	%00000101	;|X X
+     66  f63b		       07		      .byte.b	%00000111	;|XXX
+     67  f63c		       02		      .byte.b	%00000010	;| X
+     68  f63d		       02		      .byte.b	%00000010	;| X
      69  f63e		       00		      .byte.b	%00000000	;|
      70  f63f		       00		      .byte.b	%00000000	;|
      71  f640							; 4
      72  f640		       00		      .byte.b	%00000000	;|
      73  f641		       00		      .byte.b	%00000000	;|
-     74  f642		       40		      .byte.b	%01000000	;|  X
-     75  f643		       40		      .byte.b	%01000000	;|  X
-     76  f644		       40		      .byte.b	%01000000	;|  X
-     77  f645		       40		      .byte.b	%01000000	;|  X
-     78  f646		       70		      .byte.b	%01110000	;|XXX
-     79  f647		       70		      .byte.b	%01110000	;|XXX
-     80  f648		       70		      .byte.b	%01110000	;|XXX
-     81  f649		       50		      .byte.b	%01010000	;|X X
-     82  f64a		       50		      .byte.b	%01010000	;|X X
-     83  f64b		       50		      .byte.b	%01010000	;|X X
-     84  f64c		       50		      .byte.b	%01010000	;|X X
-     85  f64d		       50		      .byte.b	%01010000	;|X X
+     74  f642		       04		      .byte.b	%00000100	;|  X
+     75  f643		       04		      .byte.b	%00000100	;|  X
+     76  f644		       04		      .byte.b	%00000100	;|  X
+     77  f645		       04		      .byte.b	%00000100	;|  X
+     78  f646		       07		      .byte.b	%00000111	;|XXX
+     79  f647		       07		      .byte.b	%00000111	;|XXX
+     80  f648		       07		      .byte.b	%00000111	;|XXX
+     81  f649		       05		      .byte.b	%00000101	;|X X
+     82  f64a		       05		      .byte.b	%00000101	;|X X
+     83  f64b		       05		      .byte.b	%00000101	;|X X
+     84  f64c		       05		      .byte.b	%00000101	;|X X
+     85  f64d		       05		      .byte.b	%00000101	;|X X
      86  f64e		       00		      .byte.b	%00000000	;|
      87  f64f		       00		      .byte.b	%00000000	;|
      88  f650							; 5
      89  f650		       00		      .byte.b	%00000000	;|
      90  f651		       00		      .byte.b	%00000000	;|
-     91  f652		       20		      .byte.b	%00100000	;| X
-     92  f653		       70		      .byte.b	%01110000	;|XXX
-     93  f654		       50		      .byte.b	%01010000	;|X X
-     94  f655		       40		      .byte.b	%01000000	;|  X
-     95  f656		       40		      .byte.b	%01000000	;|  X
-     96  f657		       60		      .byte.b	%01100000	;| XX
-     97  f658		       30		      .byte.b	%00110000	;|XX
-     98  f659		       30		      .byte.b	%00110000	;|XX
-     99  f65a		       10		      .byte.b	%00010000	;|X
-    100  f65b		       10		      .byte.b	%00010000	;|X
-    101  f65c		       70		      .byte.b	%01110000	;|XXX
-    102  f65d		       70		      .byte.b	%01110000	;|XXX
+     91  f652		       02		      .byte.b	%00000010	;| X
+     92  f653		       07		      .byte.b	%00000111	;|XXX
+     93  f654		       05		      .byte.b	%00000101	;|X X
+     94  f655		       04		      .byte.b	%00000100	;|  X
+     95  f656		       04		      .byte.b	%00000100	;|  X
+     96  f657		       06		      .byte.b	%00000110	;| XX
+     97  f658		       03		      .byte.b	%00000011	;|XX
+     98  f659		       03		      .byte.b	%00000011	;|XX
+     99  f65a		       01		      .byte.b	%00000001	;|X
+    100  f65b		       01		      .byte.b	%00000001	;|X
+    101  f65c		       07		      .byte.b	%00000111	;|XXX
+    102  f65d		       07		      .byte.b	%00000111	;|XXX
     103  f65e		       00		      .byte.b	%00000000	;|
     104  f65f		       00		      .byte.b	%00000000	;|
     105  f660							; 6
     106  f660		       00		      .byte.b	%00000000	;|
     107  f661		       00		      .byte.b	%00000000	;|
-    108  f662		       20		      .byte.b	%00100000	;| X
-    109  f663		       20		      .byte.b	%00100000	;| X
-    110  f664		       70		      .byte.b	%01110000	;|XXX
-    111  f665		       50		      .byte.b	%01010000	;|X X
-    112  f666		       50		      .byte.b	%01010000	;|X X
-    113  f667		       70		      .byte.b	%01110000	;|XXX
-    114  f668		       30		      .byte.b	%00110000	;|XX
-    115  f669		       10		      .byte.b	%00010000	;|X
-    116  f66a		       10		      .byte.b	%00010000	;|X
-    117  f66b		       10		      .byte.b	%00010000	;|X
-    118  f66c		       70		      .byte.b	%01110000	;|XXX
-    119  f66d		       60		      .byte.b	%01100000	;| XX
+    108  f662		       02		      .byte.b	%00000010	;| X
+    109  f663		       02		      .byte.b	%00000010	;| X
+    110  f664		       07		      .byte.b	%00000111	;|XXX
+    111  f665		       05		      .byte.b	%00000101	;|X X
+    112  f666		       05		      .byte.b	%00000101	;|X X
+    113  f667		       07		      .byte.b	%00000111	;|XXX
+    114  f668		       03		      .byte.b	%00000011	;|XX
+    115  f669		       01		      .byte.b	%00000001	;|X
+    116  f66a		       01		      .byte.b	%00000001	;|X
+    117  f66b		       01		      .byte.b	%00000001	;|X
+    118  f66c		       07		      .byte.b	%00000111	;|XXX
+    119  f66d		       06		      .byte.b	%00000110	;| XX
     120  f66e		       00		      .byte.b	%00000000	;|
     121  f66f		       00		      .byte.b	%00000000	;|
     122  f670							; 7
     123  f670		       00		      .byte.b	%00000000	;|
     124  f671		       00		      .byte.b	%00000000	;|
-    125  f672		       10		      .byte.b	%00010000	;|X
-    126  f673		       10		      .byte.b	%00010000	;|X
-    127  f674		       10		      .byte.b	%00010000	;|X
-    128  f675		       20		      .byte.b	%00100000	;| X
-    129  f676		       20		      .byte.b	%00100000	;| X
-    130  f677		       20		      .byte.b	%00100000	;| X
-    131  f678		       60		      .byte.b	%01100000	;| XX
-    132  f679		       40		      .byte.b	%01000000	;|  X
-    133  f67a		       40		      .byte.b	%01000000	;|  X
-    134  f67b		       50		      .byte.b	%01010000	;|X X
-    135  f67c		       70		      .byte.b	%01110000	;|XXX
-    136  f67d		       70		      .byte.b	%01110000	;|XXX
+    125  f672		       01		      .byte.b	%00000001	;|X
+    126  f673		       01		      .byte.b	%00000001	;|X
+    127  f674		       01		      .byte.b	%00000001	;|X
+    128  f675		       02		      .byte.b	%00000010	;| X
+    129  f676		       02		      .byte.b	%00000010	;| X
+    130  f677		       02		      .byte.b	%00000010	;| X
+    131  f678		       06		      .byte.b	%00000110	;| XX
+    132  f679		       04		      .byte.b	%00000100	;|  X
+    133  f67a		       04		      .byte.b	%00000100	;|  X
+    134  f67b		       05		      .byte.b	%00000101	;|X X
+    135  f67c		       07		      .byte.b	%00000111	;|XXX
+    136  f67d		       07		      .byte.b	%00000111	;|XXX
     137  f67e		       00		      .byte.b	%00000000	;|
     138  f67f		       00		      .byte.b	%00000000	;|
     139  f680							; 8
     140  f680		       00		      .byte.b	%00000000	;|
     141  f681		       00		      .byte.b	%00000000	;|
-    142  f682		       20		      .byte.b	%00100000	;| X
-    143  f683		       70		      .byte.b	%01110000	;|XXX
-    144  f684		       50		      .byte.b	%01010000	;|X X
-    145  f685		       50		      .byte.b	%01010000	;|X X
-    146  f686		       50		      .byte.b	%01010000	;|X X
-    147  f687		       20		      .byte.b	%00100000	;| X
-    148  f688		       20		      .byte.b	%00100000	;| X
-    149  f689		       50		      .byte.b	%01010000	;|X X
-    150  f68a		       50		      .byte.b	%01010000	;|X X
-    151  f68b		       50		      .byte.b	%01010000	;|X X
-    152  f68c		       70		      .byte.b	%01110000	;|XXX
-    153  f68d		       20		      .byte.b	%00100000	;| X
+    142  f682		       02		      .byte.b	%00000010	;| X
+    143  f683		       07		      .byte.b	%00000111	;|XXX
+    144  f684		       05		      .byte.b	%00000101	;|X X
+    145  f685		       05		      .byte.b	%00000101	;|X X
+    146  f686		       05		      .byte.b	%00000101	;|X X
+    147  f687		       02		      .byte.b	%00000010	;| X
+    148  f688		       02		      .byte.b	%00000010	;| X
+    149  f689		       05		      .byte.b	%00000101	;|X X
+    150  f68a		       05		      .byte.b	%00000101	;|X X
+    151  f68b		       05		      .byte.b	%00000101	;|X X
+    152  f68c		       07		      .byte.b	%00000111	;|XXX
+    153  f68d		       02		      .byte.b	%00000010	;| X
     154  f68e		       00		      .byte.b	%00000000	;|
     155  f68f		       00		      .byte.b	%00000000	;|
     156  f690							; 9
     157  f690		       00		      .byte.b	%00000000	;|
     158  f691		       00		      .byte.b	%00000000	;|
-    159  f692		       30		      .byte.b	%00110000	;|XX
-    160  f693		       70		      .byte.b	%01110000	;|XXX
-    161  f694		       40		      .byte.b	%01000000	;|  X
-    162  f695		       40		      .byte.b	%01000000	;|  X
-    163  f696		       60		      .byte.b	%01100000	;| XX
-    164  f697		       70		      .byte.b	%01110000	;|XXX
-    165  f698		       50		      .byte.b	%01010000	;|X X
-    166  f699		       50		      .byte.b	%01010000	;|X X
-    167  f69a		       50		      .byte.b	%01010000	;|X X
-    168  f69b		       70		      .byte.b	%01110000	;|XXX
-    169  f69c		       30		      .byte.b	%00110000	;|XX
-    170  f69d		       20		      .byte.b	%00100000	;| X
+    159  f692		       03		      .byte.b	%00000011	;|XX
+    160  f693		       07		      .byte.b	%00000111	;|XXX
+    161  f694		       04		      .byte.b	%00000100	;|  X
+    162  f695		       04		      .byte.b	%00000100	;|  X
+    163  f696		       06		      .byte.b	%00000110	;| XX
+    164  f697		       07		      .byte.b	%00000111	;|XXX
+    165  f698		       05		      .byte.b	%00000101	;|X X
+    166  f699		       05		      .byte.b	%00000101	;|X X
+    167  f69a		       05		      .byte.b	%00000101	;|X X
+    168  f69b		       07		      .byte.b	%00000111	;|XXX
+    169  f69c		       03		      .byte.b	%00000011	;|XX
+    170  f69d		       02		      .byte.b	%00000010	;| X
     171  f69e		       00		      .byte.b	%00000000	;|
     172  f69f		       00		      .byte.b	%00000000	;|
     173  f6a0							; blank
@@ -1830,9 +1638,9 @@
     190  f6b0							; decimal
     191  f6b0		       00		      .byte.b	%00000000	;|
     192  f6b1		       00		      .byte.b	%00000000	;|
-    193  f6b2		       20		      .byte.b	%00100000	;| X
-    194  f6b3		       20		      .byte.b	%00100000	;| X
-    195  f6b4		       20		      .byte.b	%00100000	;| X
+    193  f6b2		       02		      .byte.b	%00000010	;| X
+    194  f6b3		       02		      .byte.b	%00000010	;| X
+    195  f6b4		       02		      .byte.b	%00000010	;| X
     196  f6b5		       00		      .byte.b	%00000000	;|
     197  f6b6		       00		      .byte.b	%00000000	;|
     198  f6b7		       00		      .byte.b	%00000000	;|
@@ -1847,26 +1655,252 @@
     207  f6c0							; star
     208  f6c0		       00		      .byte.b	%00000000	;|
     209  f6c1		       00		      .byte.b	%00000000	;|
-    210  f6c2		       50		      .byte.b	%01010000	;|x x
-    211  f6c3		       50		      .byte.b	%01010000	;|x x
-    212  f6c4		       50		      .byte.b	%01010000	;|x x
-    213  f6c5		       20		      .byte.b	%00100000	;| x
-    214  f6c6		       20		      .byte.b	%00100000	;| x
-    215  f6c7		       70		      .byte.b	%01110000	;|xxx
-    216  f6c8		       70		      .byte.b	%01110000	;|xxx
-    217  f6c9		       20		      .byte.b	%00100000	;| x
-    218  f6ca		       20		      .byte.b	%00100000	;| x
-    219  f6cb		       50		      .byte.b	%01010000	;|x x
-    220  f6cc		       50		      .byte.b	%01010000	;|x x
-    221  f6cd		       50		      .byte.b	%01010000	;|x x
+    210  f6c2		       05		      .byte.b	%00000101	;|x x
+    211  f6c3		       05		      .byte.b	%00000101	;|x x
+    212  f6c4		       05		      .byte.b	%00000101	;|x x
+    213  f6c5		       02		      .byte.b	%00000010	;| x
+    214  f6c6		       02		      .byte.b	%00000010	;| x
+    215  f6c7		       07		      .byte.b	%00000111	;|xxx
+    216  f6c8		       07		      .byte.b	%00000111	;|xxx
+    217  f6c9		       02		      .byte.b	%00000010	;| x
+    218  f6ca		       05		      .byte.b	%00000101	;| x
+    219  f6cb		       05		      .byte.b	%00000101	;|x x
+    220  f6cc		       05		      .byte.b	%00000101	;|x x
+    221  f6cd		       00		      .byte.b	%00000000	;|x x
     222  f6ce		       00		      .byte.b	%00000000	;|
     223  f6cf		       00		      .byte.b	%00000000	;|
 ------- FILE cart.asm
-    586  f6d0
-    587  f6d0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    588  f6d0							;;;;  end ROM lookup tables
-    589  f6d0
-    590  f6d0							;;; Complete to 4kB
-    591  fffc					      org	$FFFC
-    592  fffc		       00 f0		      .word.w	Start
-    593  fffe		       00 f0		      .word.w	Start
+------- FILE digitTableLeftRev.h LEVEL 2 PASS 2
+      0  f6d0					      include	"digitTableLeftRev.h"
+      1  f700		       00 00 00 00*	      align	256
+      2  f700				   digitTableLeftRev
+      3  f700							; 0
+      4  f700		       00		      .byte.b	%00000000	;|
+      5  f701		       00		      .byte.b	%00000000	;|
+      6  f702		       20		      .byte.b	%00100000	;| X
+      7  f703		       20		      .byte.b	%00100000	;| X
+      8  f704		       70		      .byte.b	%01110000	;|XXX
+      9  f705		       50		      .byte.b	%01010000	;|X X
+     10  f706		       50		      .byte.b	%01010000	;|X X
+     11  f707		       50		      .byte.b	%01010000	;|X X
+     12  f708		       50		      .byte.b	%01010000	;|X X
+     13  f709		       50		      .byte.b	%01010000	;|X X
+     14  f70a		       50		      .byte.b	%01010000	;|X X
+     15  f70b		       70		      .byte.b	%01110000	;|XXX
+     16  f70c		       20		      .byte.b	%00100000	;| X
+     17  f70d		       20		      .byte.b	%00100000	;| X
+     18  f70e		       00		      .byte.b	%00000000	;|
+     19  f70f		       00		      .byte.b	%00000000	;|
+     20  f710							; 1
+     21  f710		       00		      .byte.b	%00000000	;|
+     22  f711		       00		      .byte.b	%00000000	;|
+     23  f712		       70		      .byte.b	%01110000	;|XXX
+     24  f713		       70		      .byte.b	%01110000	;|XXX
+     25  f714		       70		      .byte.b	%01110000	;|XXX
+     26  f715		       20		      .byte.b	%00100000	;| X
+     27  f716		       20		      .byte.b	%00100000	;| X
+     28  f717		       20		      .byte.b	%00100000	;| X
+     29  f718		       20		      .byte.b	%00100000	;| X
+     30  f719		       20		      .byte.b	%00100000	;| X
+     31  f71a		       20		      .byte.b	%00100000	;| X
+     32  f71b		       30		      .byte.b	%00110000	;|XX
+     33  f71c		       30		      .byte.b	%00110000	;|XX
+     34  f71d		       20		      .byte.b	%00100000	;| X
+     35  f71e		       00		      .byte.b	%00000000	;|
+     36  f71f		       00		      .byte.b	%00000000	;|
+     37  f720							; 2
+     38  f720		       00		      .byte.b	%00000000	;|
+     39  f721		       00		      .byte.b	%00000000	;|
+     40  f722		       70		      .byte.b	%01110000	;|XXX
+     41  f723		       70		      .byte.b	%01110000	;|XXX
+     42  f724		       10		      .byte.b	%00010000	;|X
+     43  f725		       10		      .byte.b	%00010000	;|X
+     44  f726		       30		      .byte.b	%00110000	;|XX
+     45  f727		       60		      .byte.b	%01100000	;| XX
+     46  f728		       60		      .byte.b	%01100000	;| XX
+     47  f729		       40		      .byte.b	%01000000	;|  X
+     48  f72a		       50		      .byte.b	%01010000	;|X X
+     49  f72b		       70		      .byte.b	%01110000	;|XXX
+     50  f72c		       70		      .byte.b	%01110000	;|XXX
+     51  f72d		       20		      .byte.b	%00100000	;| X
+     52  f72e		       00		      .byte.b	%00000000	;|
+     53  f72f		       00		      .byte.b	%00000000	;|
+     54  f730							; 3
+     55  f730		       00		      .byte.b	%00000000	;|
+     56  f731		       00		      .byte.b	%00000000	;|
+     57  f732		       20		      .byte.b	%00100000	;| X
+     58  f733		       20		      .byte.b	%00100000	;| X
+     59  f734		       70		      .byte.b	%01110000	;|XXX
+     60  f735		       50		      .byte.b	%01010000	;|X X
+     61  f736		       40		      .byte.b	%01000000	;|  X
+     62  f737		       20		      .byte.b	%00100000	;| X
+     63  f738		       60		      .byte.b	%01100000	;| XX
+     64  f739		       40		      .byte.b	%01000000	;|  X
+     65  f73a		       50		      .byte.b	%01010000	;|X X
+     66  f73b		       70		      .byte.b	%01110000	;|XXX
+     67  f73c		       20		      .byte.b	%00100000	;| X
+     68  f73d		       20		      .byte.b	%00100000	;| X
+     69  f73e		       00		      .byte.b	%00000000	;|
+     70  f73f		       00		      .byte.b	%00000000	;|
+     71  f740							; 4
+     72  f740		       00		      .byte.b	%00000000	;|
+     73  f741		       00		      .byte.b	%00000000	;|
+     74  f742		       40		      .byte.b	%01000000	;|  X
+     75  f743		       40		      .byte.b	%01000000	;|  X
+     76  f744		       40		      .byte.b	%01000000	;|  X
+     77  f745		       40		      .byte.b	%01000000	;|  X
+     78  f746		       70		      .byte.b	%01110000	;|XXX
+     79  f747		       70		      .byte.b	%01110000	;|XXX
+     80  f748		       70		      .byte.b	%01110000	;|XXX
+     81  f749		       50		      .byte.b	%01010000	;|X X
+     82  f74a		       50		      .byte.b	%01010000	;|X X
+     83  f74b		       50		      .byte.b	%01010000	;|X X
+     84  f74c		       50		      .byte.b	%01010000	;|X X
+     85  f74d		       50		      .byte.b	%01010000	;|X X
+     86  f74e		       00		      .byte.b	%00000000	;|
+     87  f74f		       00		      .byte.b	%00000000	;|
+     88  f750							; 5
+     89  f750		       00		      .byte.b	%00000000	;|
+     90  f751		       00		      .byte.b	%00000000	;|
+     91  f752		       20		      .byte.b	%00100000	;| X
+     92  f753		       70		      .byte.b	%01110000	;|XXX
+     93  f754		       50		      .byte.b	%01010000	;|X X
+     94  f755		       40		      .byte.b	%01000000	;|  X
+     95  f756		       40		      .byte.b	%01000000	;|  X
+     96  f757		       60		      .byte.b	%01100000	;| XX
+     97  f758		       30		      .byte.b	%00110000	;|XX
+     98  f759		       30		      .byte.b	%00110000	;|XX
+     99  f75a		       10		      .byte.b	%00010000	;|X
+    100  f75b		       10		      .byte.b	%00010000	;|X
+    101  f75c		       70		      .byte.b	%01110000	;|XXX
+    102  f75d		       70		      .byte.b	%01110000	;|XXX
+    103  f75e		       00		      .byte.b	%00000000	;|
+    104  f75f		       00		      .byte.b	%00000000	;|
+    105  f760							; 6
+    106  f760		       00		      .byte.b	%00000000	;|
+    107  f761		       00		      .byte.b	%00000000	;|
+    108  f762		       20		      .byte.b	%00100000	;| X
+    109  f763		       20		      .byte.b	%00100000	;| X
+    110  f764		       70		      .byte.b	%01110000	;|XXX
+    111  f765		       50		      .byte.b	%01010000	;|X X
+    112  f766		       50		      .byte.b	%01010000	;|X X
+    113  f767		       70		      .byte.b	%01110000	;|XXX
+    114  f768		       30		      .byte.b	%00110000	;|XX
+    115  f769		       10		      .byte.b	%00010000	;|X
+    116  f76a		       10		      .byte.b	%00010000	;|X
+    117  f76b		       10		      .byte.b	%00010000	;|X
+    118  f76c		       70		      .byte.b	%01110000	;|XXX
+    119  f76d		       60		      .byte.b	%01100000	;| XX
+    120  f76e		       00		      .byte.b	%00000000	;|
+    121  f76f		       00		      .byte.b	%00000000	;|
+    122  f770							; 7
+    123  f770		       00		      .byte.b	%00000000	;|
+    124  f771		       00		      .byte.b	%00000000	;|
+    125  f772		       10		      .byte.b	%00010000	;|X
+    126  f773		       10		      .byte.b	%00010000	;|X
+    127  f774		       10		      .byte.b	%00010000	;|X
+    128  f775		       20		      .byte.b	%00100000	;| X
+    129  f776		       20		      .byte.b	%00100000	;| X
+    130  f777		       20		      .byte.b	%00100000	;| X
+    131  f778		       60		      .byte.b	%01100000	;| XX
+    132  f779		       40		      .byte.b	%01000000	;|  X
+    133  f77a		       40		      .byte.b	%01000000	;|  X
+    134  f77b		       50		      .byte.b	%01010000	;|X X
+    135  f77c		       70		      .byte.b	%01110000	;|XXX
+    136  f77d		       70		      .byte.b	%01110000	;|XXX
+    137  f77e		       00		      .byte.b	%00000000	;|
+    138  f77f		       00		      .byte.b	%00000000	;|
+    139  f780							; 8
+    140  f780		       00		      .byte.b	%00000000	;|
+    141  f781		       00		      .byte.b	%00000000	;|
+    142  f782		       20		      .byte.b	%00100000	;| X
+    143  f783		       70		      .byte.b	%01110000	;|XXX
+    144  f784		       50		      .byte.b	%01010000	;|X X
+    145  f785		       50		      .byte.b	%01010000	;|X X
+    146  f786		       50		      .byte.b	%01010000	;|X X
+    147  f787		       20		      .byte.b	%00100000	;| X
+    148  f788		       20		      .byte.b	%00100000	;| X
+    149  f789		       50		      .byte.b	%01010000	;|X X
+    150  f78a		       50		      .byte.b	%01010000	;|X X
+    151  f78b		       50		      .byte.b	%01010000	;|X X
+    152  f78c		       70		      .byte.b	%01110000	;|XXX
+    153  f78d		       20		      .byte.b	%00100000	;| X
+    154  f78e		       00		      .byte.b	%00000000	;|
+    155  f78f		       00		      .byte.b	%00000000	;|
+    156  f790							; 9
+    157  f790		       00		      .byte.b	%00000000	;|
+    158  f791		       00		      .byte.b	%00000000	;|
+    159  f792		       30		      .byte.b	%00110000	;|XX
+    160  f793		       70		      .byte.b	%01110000	;|XXX
+    161  f794		       40		      .byte.b	%01000000	;|  X
+    162  f795		       40		      .byte.b	%01000000	;|  X
+    163  f796		       60		      .byte.b	%01100000	;| XX
+    164  f797		       70		      .byte.b	%01110000	;|XXX
+    165  f798		       50		      .byte.b	%01010000	;|X X
+    166  f799		       50		      .byte.b	%01010000	;|X X
+    167  f79a		       50		      .byte.b	%01010000	;|X X
+    168  f79b		       70		      .byte.b	%01110000	;|XXX
+    169  f79c		       30		      .byte.b	%00110000	;|XX
+    170  f79d		       20		      .byte.b	%00100000	;| X
+    171  f79e		       00		      .byte.b	%00000000	;|
+    172  f79f		       00		      .byte.b	%00000000	;|
+    173  f7a0							; blank
+    174  f7a0		       00		      .byte.b	%00000000	;|
+    175  f7a1		       00		      .byte.b	%00000000	;|
+    176  f7a2		       00		      .byte.b	%00000000	;|
+    177  f7a3		       00		      .byte.b	%00000000	;|
+    178  f7a4		       00		      .byte.b	%00000000	;|
+    179  f7a5		       00		      .byte.b	%00000000	;|
+    180  f7a6		       00		      .byte.b	%00000000	;|
+    181  f7a7		       00		      .byte.b	%00000000	;|
+    182  f7a8		       00		      .byte.b	%00000000	;|
+    183  f7a9		       00		      .byte.b	%00000000	;|
+    184  f7aa		       00		      .byte.b	%00000000	;|
+    185  f7ab		       00		      .byte.b	%00000000	;|
+    186  f7ac		       00		      .byte.b	%00000000	;|
+    187  f7ad		       00		      .byte.b	%00000000	;|
+    188  f7ae		       00		      .byte.b	%00000000	;|
+    189  f7af		       00		      .byte.b	%00000000	;|
+    190  f7b0							; decimal
+    191  f7b0		       00		      .byte.b	%00000000	;|
+    192  f7b1		       00		      .byte.b	%00000000	;|
+    193  f7b2		       20		      .byte.b	%00100000	;| X
+    194  f7b3		       20		      .byte.b	%00100000	;| X
+    195  f7b4		       20		      .byte.b	%00100000	;| X
+    196  f7b5		       00		      .byte.b	%00000000	;|
+    197  f7b6		       00		      .byte.b	%00000000	;|
+    198  f7b7		       00		      .byte.b	%00000000	;|
+    199  f7b8		       00		      .byte.b	%00000000	;|
+    200  f7b9		       00		      .byte.b	%00000000	;|
+    201  f7ba		       00		      .byte.b	%00000000	;|
+    202  f7bb		       00		      .byte.b	%00000000	;|
+    203  f7bc		       00		      .byte.b	%00000000	;|
+    204  f7bd		       00		      .byte.b	%00000000	;|
+    205  f7be		       00		      .byte.b	%00000000	;|
+    206  f7bf		       00		      .byte.b	%00000000	;|
+    207  f7c0							; star
+    208  f7c0		       00		      .byte.b	%00000000	;|
+    209  f7c1		       00		      .byte.b	%00000000	;|
+    210  f7c2		       50		      .byte.b	%01010000	;|x x
+    211  f7c3		       50		      .byte.b	%01010000	;|x x
+    212  f7c4		       50		      .byte.b	%01010000	;|x x
+    213  f7c5		       20		      .byte.b	%00100000	;| x
+    214  f7c6		       20		      .byte.b	%00100000	;| x
+    215  f7c7		       70		      .byte.b	%01110000	;|xxx
+    216  f7c8		       70		      .byte.b	%01110000	;|xxx
+    217  f7c9		       20		      .byte.b	%00100000	;| x
+    218  f7ca		       20		      .byte.b	%00100000	;| x
+    219  f7cb		       50		      .byte.b	%01010000	;|x x
+    220  f7cc		       50		      .byte.b	%01010000	;|x x
+    221  f7cd		       50		      .byte.b	%01010000	;|x x
+    222  f7ce		       00		      .byte.b	%00000000	;|
+    223  f7cf		       00		      .byte.b	%00000000	;|
+------- FILE cart.asm
+    620  f7d0
+    621  f7d0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    622  f7d0							;;;;  end ROM lookup tables
+    623  f7d0
+    624  f7d0							;;; Complete to 4kB
+    625  fffc					      org	$FFFC
+    626  fffc		       00 f0		      .word.w	Start
+    627  fffe		       00 f0		      .word.w	Start

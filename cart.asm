@@ -24,8 +24,8 @@ P0score      byte ; (86) P0 score
 P0bitmap     byte ; (87) P0bitmap (without screen-draw offset)
 LeftScore4   byte ; (88) Score Digits
 LeftScore5   byte ; (89) Score Digits
-Active       byte ; (8a) Whether to count time
-DelayTime    byte ; (8a) Whether to count time
+Active       byte ; (8a) bit 0 = count time, bit 1 = check input
+DelayTime    byte ; (8a) Time left in delay
 Rand8        byte ; (8b) 8-bit random
 
 ; Top Bar digit pointers
@@ -55,25 +55,25 @@ Start:
     lda INTIM    ; unknown from timer
 	ora $1       ; can't be zero
 	sta Rand8
-;;; player coordinates	
-	lda #88
-	sta P0y
-	lda #70
+;;; Set initial P0bitmap to Up
+	lda #<Ubitmap
+	sta P0bitmap
+;;; player coordinates (match bitmap above)
+	lda PositionX+2
 	sta P0x
+	lda PositionY+2
+	sta P0y
 ;;; Set high byte of P0spritePtr (low byte updated per frame)
 	lda #>BitmapTable
 	sta P0spriteHi
-;;; Set initial P0bitmap
-	lda #<Ubitmap
-	sta P0bitmap
 ;;; set timer to 999 (decimal)
     lda #153     ; hex 99
 	sta P0time0
 	lda #9
 	sta P0time1
 
-;;; start with time active
-    lda #1
+;;; check input but don't consume time
+    lda #%0000010
 	sta Active
 
 ;;; Set Score Digits
@@ -100,8 +100,8 @@ Start:
     lda #55
 	sta COLUPF
 	; player/missile size register
-	;lda %00000000    ; one player, single-sized
-	lda %00000101    ; one player, double-sized
+	lda %00000000    ; one player, single-sized
+	;lda %00000101    ; one player, double-sized
 	;lda %00000111    ; one player, quad-sized
 	sta NUSIZ0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -126,18 +126,15 @@ StartFrame:
 ;;;;  start game vblank logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; check if active
-    lda Active
-	beq NotActive
-	jsr ConsumeTime
+;;; Consume Time
+	jsr ConsumeTime ; checks 0 bit of Active
+;;; check if open for input
+    lda #%00000010  ; 1 bit of Active governs input
+    bit Active
+	beq NotActive   
 	jmp CheckInput
 ;;; not active so check if time to activate
 NotActive
-    lda P0bitmap
-	cmp #<Xbitmap
-    bne NotX
-	jsr ConsumeTime
-NotX
     lda DelayTime
 	beq NoNewBitmap  ; already zero
 	sec
@@ -151,8 +148,28 @@ NewBitmap
 	clc
 	lda BitmapIndex,Y
 	sta P0bitmap
+	; Update position
+	lda #5         ; starting at 999 so half is roughly 500
+	cmp P0time1
+	bcs RandomPosition ; if 5 > P0time1
+FixedPosition:
+    lda PositionX,Y
+	sta P0x
+    lda PositionY,Y
+	sta P0y
+	jmp SetActive
+RandomPosition:
+	jsr Random
+	and #%01111111 ; upper bound 127 
+	ora #%00010000 ; lower bound 16
+	sta P0x
+	jsr Random
+	and #%01111111 ; upper bound 127 
+	ora #%00010000 ; lower bound 16
+	sta P0y
+SetActive:	
 	; set Active
-	lda #1
+	lda #3
 	sta Active
 NoNewBitmap
     jmp EndP0Input
@@ -187,7 +204,7 @@ CheckInputCorrect:
     cpx #<NullBitmap   ; if x hasn't changed
 	beq EndP0Input	   ; we didn't get input
 	lda #0             ; if we did get input
-	sta Active         ; stop time counter
+	sta Active         ; stop time counter and input checking
 	cpx P0bitmap       ; check if input matches icon
 	bne P0Incorrect
 P0Correct:
@@ -272,8 +289,10 @@ EndP0Input:
 ;;; one more black line before moving to play area
 	sta WSYNC
 	ldy #177	; counter
+	ldx #0      ; first GRP0 should be 0
 .LoopVisible:
 ;;; for rainbow background
+	stx GRP0	; 3 (calculated on previous line)
 	sty COLUBK	; set bg color to loop var
 
 ;;; draw P0
@@ -289,7 +308,7 @@ EndP0Input:
 	bcs .NoDrawP0	; 3
 .DrawP0
 	lda (P0spritePtr),Y	; 5
-	sta GRP0	; 3
+	tax
 .NoDrawP0
 
 	sta WSYNC	; wait for next scanline
@@ -329,6 +348,11 @@ EndP0Input:
 ;;; Load Score Pointers based on corresponding values
 
 ConsumeTime SUBROUTINE
+    lda #%00000001  ; 0 bit of Active governs time
+    bit Active
+	bne UseTime
+	rts
+UseTime
 	sed
     sec
     lda P0time0
@@ -341,13 +365,17 @@ ConsumeTime SUBROUTINE
 	bcc TimesUp
 	rts
 TimesUp:
-	; time's up, set back to 0 and deactive countdown
+	; time's up, set back to 0 and deactivate countdown
 	lda #0
 	sta P0time0
 	sta P0time1
 	sta Active
 	lda #<TimeBitmap
 	sta P0bitmap
+	lda PositionX+2
+	sta P0x
+	lda PositionY
+	sta P0y
 	rts
 
 LoadScorePointers SUBROUTINE
@@ -405,6 +433,7 @@ LoadScorePointers SUBROUTINE
 
 	rts
 
+    align 256 ; PosObject is timing dependent and can't cross page boundaries
 ;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
 ; Positions an object horizontally
 ; Inputs: A = Desired position.
@@ -553,7 +582,7 @@ TimeBitmap:
 	byte #%01011010
 	byte #%00100100
 	byte #%00011000
-	byte #%00111100
+	byte #%00100100
 	byte #%01000010
 	byte #%11111111
 	byte #%00000000
@@ -569,13 +598,18 @@ P0color:
 	byte #$00
 	byte #$00
 
-P0Index:
-    byte #<Lbitmap
-	byte #<Rbitmap
-	byte #<Ubitmap
-	byte #<Dbitmap
-	byte #<NullBitmap
-	byte #<Xbitmap
+;;; X and Y location per directional icon
+PositionX:
+	byte #53   ; left
+	byte #107  ; right
+	byte #80   ; up
+	byte #80   ; down
+
+PositionY:
+	byte #93   ; left (177/2 - 9/2)
+	byte #93   ; right
+	byte #128  ; up
+	byte #59   ; down
 
 ;;; digits.h should set digitTable at the beginning followed by
 ;;;          an array of 16 bytes for each digit 0-9
