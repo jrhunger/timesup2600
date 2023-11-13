@@ -15,3 +15,10 @@ Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.b
 ## TODO
 * Make the icons larger
 * Add github actions to build and publish
+* Add sound
+  * buzz for error
+  * nice sound for correct
+  * neutral sound when icon pops
+* Game controls:
+  * game select - add time?
+  * difficulty - disable random position?

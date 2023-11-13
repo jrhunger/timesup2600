@@ -6,6 +6,17 @@
 ;;;; start constant declarations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 P0HEIGHT equ 9
+; contants for use with game state
+ST_TIMECOUNT equ %00000001  ; counting time?
+ST_GAMEINPUT equ %00000010  ; checking player input?
+ST_CHECKRST  equ %00000100  ; checking reset switch?
+ST_CHECKSLCT equ %00001000  ; checking select switch?
+; contants for reading console switches
+SW_RESET     equ %00000001  ; reset switch
+SW_SELECT    equ %00000010  ; select switch
+SW_COLOR     equ %00001000  ; b/w (0) / color (1)
+SW_P0DIFF    equ %01000000  ; P0 difficulty | 0 = Beginner
+SW_P1DIFF    equ %10000000  ; P1 difficulty | 1 = Advanced
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; end constant declarations
 
@@ -24,7 +35,8 @@ P0score      byte ; (86) P0 score
 P0bitmap     byte ; (87) P0bitmap (without screen-draw offset)
 LeftScore4   byte ; (88) Score Digits
 LeftScore5   byte ; (89) Score Digits
-Active       byte ; (8a) bit 0 = count time, bit 1 = check input
+; GameState - bitwise game state, see ST_* contsants
+GameState    byte ; (8a) 
 DelayTime    byte ; (8a) Time left in delay
 Rand8        byte ; (8b) 8-bit random
 
@@ -73,8 +85,8 @@ Start:
 	sta P0time1
 
 ;;; check input but don't consume time
-    lda #%0000010
-	sta Active
+    lda ST_GAMEINPUT
+	sta GameState
 
 ;;; Set Score Digits
     lda #$0a     ; blank
@@ -127,10 +139,10 @@ StartFrame:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Consume Time
-	jsr ConsumeTime ; checks 0 bit of Active
+	jsr ConsumeTime
 ;;; check if open for input
-    lda #%00000010  ; 1 bit of Active governs input
-    bit Active
+    lda ST_GAMEINPUT
+    bit GameState
 	beq NotActive   
 	jmp CheckInput
 ;;; not active so check if time to activate
@@ -169,8 +181,8 @@ RandomPosition:
 	sta P0y
 SetActive:	
 	; set Active
-	lda #3
-	sta Active
+	lda ST_GAMEINPUT | ST_TIMECOUNT
+	sta GameState
 NoNewBitmap
     jmp EndP0Input
 
@@ -204,7 +216,7 @@ CheckInputCorrect:
     cpx #<NullBitmap   ; if x hasn't changed
 	beq EndP0Input	   ; we didn't get input
 	lda #0             ; if we did get input
-	sta Active         ; stop time counter and input checking
+	sta GameState      ; stop time counter and input checking
 	cpx P0bitmap       ; check if input matches icon
 	bne P0Incorrect
 P0Correct:
@@ -222,14 +234,27 @@ P0Correct:
 P0Incorrect:
 	lda #<Xbitmap      ; set bitmap to X
 	sta P0bitmap
+	lda ST_TIMECOUNT   ; time active, input not
+	sta GameState
 SetDelay:
 	; set a random delay
 	jsr Random
 	and #%00111111     ; max 127 (around 2.5 second)
 	ora #%00100000     ; min 31 (a little more than 1/2 second)
 	sta DelayTime
-;;; end of input processing	
 EndP0Input:
+; check for reset
+ResetCheck:
+    lda ST_CHECKRST
+	bit GameState
+	beq EndResetCheck
+	lda SW_RESET
+	bit SWCHB
+	bne EndResetCheck
+	jmp Start
+EndResetCheck:
+;;; end of input processing	
+
 
 ;;; P0 horizontal position
 	ldx #0
@@ -348,8 +373,8 @@ EndP0Input:
 ;;; Load Score Pointers based on corresponding values
 
 ConsumeTime SUBROUTINE
-    lda #%00000001  ; 0 bit of Active governs time
-    bit Active
+    lda ST_TIMECOUNT  ; check if TIMECOUNT bit
+    bit GameState     ; is set in GameState
 	bne UseTime
 	rts
 UseTime
@@ -369,7 +394,8 @@ TimesUp:
 	lda #0
 	sta P0time0
 	sta P0time1
-	sta Active
+	lda ST_CHECKRST | ST_CHECKSLCT
+	sta GameState
 	lda #<TimeBitmap
 	sta P0bitmap
 	lda PositionX+2
