@@ -407,26 +407,27 @@
      39 U008a		       00	   GameState  byte.b		; (8a)
      40 U008b		       00	   DelayTime  byte.b		; (8a) Time left in delay
      41 U008c		       00	   Rand8      byte.b		; (8b) 8-bit random
-     42 U008d
-     43 U008d							; Top Bar digit pointers
-     44 U00a0					      org	$a0
-     45 U00a0		       00 00	   LeftScorePtr0 word.w		; (a0/1)
-     46 U00a2		       00 00	   LeftScorePtr1 word.w		; (a2/3)
-     47 U00a4		       00 00	   LeftScorePtr2 word.w		; (a4/5)
-     48 U00a6		       00 00	   LeftScorePtr3 word.w		; (a6/7)
-     49 U00a8		       00 00	   LeftScorePtr4 word.w		; (a8/9)
-     50 U00aa		       00 00	   LeftScorePtr5 word.w		; (aa/b)
-     51 U00ac		       00 00	   RightScorePtr0 word.w		; (ac/d)
-     52 U00ae		       00 00	   RightScorePtr1 word.w		; (ae/f)
-     53 U00b0
-     54 U00b0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     55 U00b0							;;;;  end variables
-     56 U00b0
-     57 U00b0							;;; Begin code segment in ROM at $F000
-     58  10000 ????				       seg	code
-     59  f000					      org	$F000
-     60  f000
-     61  f000				   Start
+     42 U008d		       00	   InputTime  byte.b		; (8c) Input re-check delay
+     43 U008e
+     44 U008e							; Top Bar digit pointers
+     45 U00a0					      org	$a0
+     46 U00a0		       00 00	   LeftScorePtr0 word.w		; (a0/1)
+     47 U00a2		       00 00	   LeftScorePtr1 word.w		; (a2/3)
+     48 U00a4		       00 00	   LeftScorePtr2 word.w		; (a4/5)
+     49 U00a6		       00 00	   LeftScorePtr3 word.w		; (a6/7)
+     50 U00a8		       00 00	   LeftScorePtr4 word.w		; (a8/9)
+     51 U00aa		       00 00	   LeftScorePtr5 word.w		; (aa/b)
+     52 U00ac		       00 00	   RightScorePtr0 word.w		; (ac/d)
+     53 U00ae		       00 00	   RightScorePtr1 word.w		; (ae/f)
+     54 U00b0
+     55 U00b0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     56 U00b0							;;;;  end variables
+     57 U00b0
+     58 U00b0							;;; Begin code segment in ROM at $F000
+     59  10000 ????				       seg	code
+     60  f000					      org	$F000
+     61  f000
+     62  f000				   Start
       0  f000					      CLEAN_START
       1  f000		       78		      sei
       2  f001		       d8		      cld
@@ -439,585 +440,623 @@
       9  f008		       48		      pha
      10  f009		       d0 fb		      bne	.CLEAR_STACK
      11  f00b
-     63  f00b
-     64  f00b							;;;;  start variable initialization
-     65  f00b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     66  f00b							;;; initialize Random seed
-     67  f00b		       ad 84 02 	      lda	INTIM	; unknown from timer
-     68  f00e		       05 01		      ora	$1	; can't be zero
-     69  f010		       85 8c		      sta	Rand8
-     70  f012							;;; Set initial P0bitmap to Up
-     71  f012		       a9 1f		      lda	#<Ubitmap
-     72  f014		       85 87		      sta	P0bitmap
-     73  f016							;;; player coordinates (match bitmap above)
-     74  f016		       ad 4e f4 	      lda	PositionX+2
-     75  f019		       85 80		      sta	P0x
-     76  f01b		       ad 52 f4 	      lda	PositionY+2
-     77  f01e		       85 81		      sta	P0y
-     78  f020							;;; Set high byte of P0spritePtr (low byte updated per frame)
-     79  f020		       a9 f4		      lda	#>BitmapTable
-     80  f022		       85 83		      sta	P0spriteHi
-     81  f024							;;; set timer to 999 (decimal)
-     82  f024		       a9 99		      lda	#153	; hex 99
-     83  f026		       85 84		      sta	P0time0
-     84  f028		       a9 09		      lda	#9
-     85  f02a		       85 85		      sta	P0time1
-     86  f02c
-     87  f02c							;;; check input but don't consume time
-     88  f02c		       a5 02		      lda	ST_GAMEINPUT
-     89  f02e		       85 8a		      sta	GameState
-     90  f030
-     91  f030							;;; Set Score Digits
-     92  f030		       a9 0a		      lda	#$0a	; blank
-     93  f032		       85 88		      sta	LeftScore4
-     94  f034		       85 89		      sta	LeftScore5
-     95  f036
-     96  f036							;;; set up Score pointer high bytes
-     97  f036		       a9 f8		      lda	#>digitTableLeftRev
-     98  f038		       85 a1		      sta	LeftScorePtr0+1
-     99  f03a		       85 a9		      sta	LeftScorePtr4+1
-    100  f03c		       85 ab		      sta	LeftScorePtr5+1
-    101  f03e		       85 af		      sta	RightScorePtr1+1
-    102  f040		       a9 f6		      lda	#>digitTableLeft
-    103  f042		       85 a3		      sta	LeftScorePtr1+1
-    104  f044		       a9 f5		      lda	#>digitTableRight
-    105  f046		       85 a5		      sta	LeftScorePtr2+1
-    106  f048		       a9 f7		      lda	#>digitTableRightRev
-    107  f04a		       85 a7		      sta	LeftScorePtr3+1
-    108  f04c		       85 ad		      sta	RightScorePtr0+1
-    109  f04e
-    110  f04e							;;; register setup
-    111  f04e							; playfield color
-    112  f04e		       a9 37		      lda	#55
-    113  f050		       85 08		      sta	COLUPF
-    114  f052							; player/missile size register
-    115  f052		       a5 00		      lda	%00000000	; one player, single-sized
-    116  f054							;lda %00000101    ; one player, double-sized
-    117  f054							;lda %00000111    ; one player, quad-sized
-    118  f054		       85 04		      sta	NUSIZ0
-    119  f056							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    120  f056							;;;;  end variable initialization
-    121  f056
-    122  f056				   StartFrame
-    123  f056		       a9 02		      lda	#2
-    124  f058		       85 00		      sta	VSYNC
-    125  f05a
-    126  f05a							;;; 3 lines of VSYNC
-    127  f05a		       85 02		      sta	WSYNC	; store halts until scanline complete
-    128  f05c		       85 02		      sta	WSYNC	; 2nd
-    129  f05e		       85 02		      sta	WSYNC	; 3rd
-    130  f060
-    131  f060							;;;; set timer for VBLANK
-    132  f060		       a9 2c		      LDA	#44
-    133  f062		       8d 96 02 	      STA	TIM64T
-    134  f065
-    135  f065		       a9 00		      lda	#0
-    136  f067		       85 00		      sta	VSYNC	; turn off VSYNC
-    137  f069
-    138  f069							;;;;  start game vblank logic
-    139  f069							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    140  f069
-    141  f069							;;; Consume Time
-    142  f069		       20 9c f1 	      jsr	ConsumeTime
-    143  f06c							;;; check if open for input
-    144  f06c		       a5 02		      lda	ST_GAMEINPUT
-    145  f06e		       24 8a		      bit	GameState
-    146  f070		       f0 03		      beq	NotActive
-    147  f072		       4c b8 f0 	      jmp	CheckInput
-    148  f075							;;; not active so check if time to activate
-    149  f075				   NotActive
-    150  f075		       a5 8b		      lda	DelayTime
-    151  f077		       f0 3c		      beq	NoNewBitmap	; already zero
-    152  f079		       38		      sec
-    153  f07a		       e9 01		      sbc	#1
-    154  f07c		       85 8b		      sta	DelayTime
-    155  f07e		       d0 35		      bne	NoNewBitmap
-    156  f080				   NewBitmap
-    157  f080		       20 21 f3 	      jsr	Random	; get a random #
-    158  f083		       29 03		      and	#%00000011	; truncate to 2 bits
-    159  f085		       a8		      tay		; put in Y
-    160  f086		       18		      clc
-    161  f087		       b9 00 f4 	      lda	BitmapIndex,Y
-    162  f08a		       85 87		      sta	P0bitmap
-    163  f08c							; Update position
-    164  f08c		       a9 05		      lda	#5	; starting at 999 so half is roughly 500
-    165  f08e		       c5 85		      cmp	P0time1
-    166  f090		       b0 0d		      bcs	RandomPosition	; if 5 > P0time1
-    167  f092				   FixedPosition
-    168  f092		       b9 4c f4 	      lda	PositionX,Y
-    169  f095		       85 80		      sta	P0x
-    170  f097		       b9 50 f4 	      lda	PositionY,Y
-    171  f09a		       85 81		      sta	P0y
-    172  f09c		       4c b1 f0 	      jmp	SetActive
-    173  f09f				   RandomPosition
-    174  f09f		       20 21 f3 	      jsr	Random
-    175  f0a2		       29 7f		      and	#%01111111	; upper bound 127
-    176  f0a4		       09 10		      ora	#%00010000	; lower bound 16
-    177  f0a6		       85 80		      sta	P0x
-    178  f0a8		       20 21 f3 	      jsr	Random
-    179  f0ab		       29 7f		      and	#%01111111	; upper bound 127
-    180  f0ad		       09 10		      ora	#%00010000	; lower bound 16
-    181  f0af		       85 81		      sta	P0y
-    182  f0b1				   SetActive
-    183  f0b1							; set Active
-    184  f0b1		       a5 03		      lda	ST_GAMEINPUT | ST_TIMECOUNT
-    185  f0b3		       85 8a		      sta	GameState
-    186  f0b5				   NoNewBitmap
-    187  f0b5		       4c 0b f1 	      jmp	EndP0Input
-    188  f0b8
-    189  f0b8							;;; check input signals
-    190  f0b8				   CheckInput
-    191  f0b8		       a2 31		      ldx	#<NullBitmap
-    192  f0ba				   CheckP0Up
-    193  f0ba		       a9 10		      lda	#%00010000
-    194  f0bc		       2c 80 02 	      bit	SWCHA
-    195  f0bf		       d0 02		      bne	CheckP0Down
-    196  f0c1		       a2 1f		      ldx	#<Ubitmap
-    197  f0c3				   CheckP0Down
-    198  f0c3		       a9 20		      lda	#%00100000
-    199  f0c5		       2c 80 02 	      bit	SWCHA
-    200  f0c8		       d0 02		      bne	CheckP0Right
-    201  f0ca		       a2 16		      ldx	#<Dbitmap
-    202  f0cc				   CheckP0Right
-    203  f0cc		       a9 80		      lda	#%10000000
-    204  f0ce		       2c 80 02 	      bit	SWCHA
-    205  f0d1		       d0 02		      bne	CheckP0Left
-    206  f0d3		       a2 0d		      ldx	#<Rbitmap
-    207  f0d5				   CheckP0Left
-    208  f0d5		       a9 40		      lda	#%01000000
-    209  f0d7		       2c 80 02 	      bit	SWCHA
-    210  f0da		       d0 02		      bne	EndP0InputCheck
-    211  f0dc		       a2 04		      ldx	#<Lbitmap
-    212  f0de				   EndP0InputCheck
-    213  f0de
-    214  f0de							;;; do input-related processing
-    215  f0de				   CheckInputCorrect
-    216  f0de		       e0 31		      cpx	#<NullBitmap	; if x hasn't changed
-    217  f0e0		       f0 29		      beq	EndP0Input	; we didn't get input
-    218  f0e2		       a9 00		      lda	#0	; if we did get input
-    219  f0e4		       85 8a		      sta	GameState	; stop time counter and input checking
-    220  f0e6		       e4 87		      cpx	P0bitmap	; check if input matches icon
-    221  f0e8		       d0 10		      bne	P0Incorrect
-    222  f0ea				   P0Correct
-    223  f0ea							; increment (decimal) score
-    224  f0ea		       18		      clc
-    225  f0eb		       a5 86		      lda	P0score
-    226  f0ed		       f8		      sed
-    227  f0ee		       69 01		      adc	#1
-    228  f0f0		       85 86		      sta	P0score
-    229  f0f2		       d8		      cld
-    230  f0f3							; set bitmap to null
-    231  f0f3		       a9 31		      lda	#<NullBitmap
-    232  f0f5		       85 87		      sta	P0bitmap
-    233  f0f7		       4c 02 f1 	      jmp	SetDelay
-    234  f0fa				   P0Incorrect
-    235  f0fa		       a9 28		      lda	#<Xbitmap	; set bitmap to X
-    236  f0fc		       85 87		      sta	P0bitmap
-    237  f0fe		       a5 01		      lda	ST_TIMECOUNT	; time active, input not
-    238  f100		       85 8a		      sta	GameState
-    239  f102				   SetDelay
-    240  f102							; set a random delay
-    241  f102		       20 21 f3 	      jsr	Random
-    242  f105		       29 3f		      and	#%00111111	; max 127 (around 2.5 second)
-    243  f107		       09 20		      ora	#%00100000	; min 31 (a little more than 1/2 second)
-    244  f109		       85 8b		      sta	DelayTime
-    245  f10b				   EndP0Input
-    246  f10b							; check for reset
-    247  f10b				   ResetCheck
-    248  f10b		       a5 04		      lda	ST_CHECKRST
-    249  f10d		       24 8a		      bit	GameState
-    250  f10f		       f0 0a		      beq	EndResetCheck
-    251  f111		       a5 01		      lda	SW_RESET
-    252  f113		       2c 82 02 	      bit	SWCHB
-    253  f116		       d0 03		      bne	EndResetCheck
-    254  f118		       4c 00 f0 	      jmp	Start
-    255  f11b				   EndResetCheck
-    256  f11b							;;; end of input processing
-    257  f11b
-    258  f11b
-    259  f11b							;;; P0 horizontal position
-    260  f11b		       a2 00		      ldx	#0
-    261  f11d		       a5 80		      lda	P0x
-    262  f11f		       20 00 f3 	      jsr	PosObject
-    263  f122							;;; P0 vertical position
-    264  f122		       a5 87		      lda	P0bitmap	; bitmap base
-    265  f124		       18		      clc		; clear carry for add
-    266  f125		       69 09		      adc	#P0HEIGHT	; bitmap high end
-    267  f127		       38		      sec		; set carry for subtract
-    268  f128		       e5 81		      sbc	P0y	; offset by P0y for draw logic
-    269  f12a		       85 82		      sta	P0spritePtr	; store in sprite pointer
-    270  f12c		       a9 f4		      lda	#>BitmapTable	; load 2nd byte of bitmap table
-    271  f12e		       e9 00		      sbc	#0	; subtract 0 (decrements if carry is clear from previous)
-    272  f130		       85 83		      sta	P0spritePtr+1	; store in high byte of sprite pointer
-    273  f132
-    274  f132							;;; Setup score pointers for display
-    275  f132		       20 ce f1 	      jsr	LoadScorePointers
-    276  f135
-    277  f135							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    278  f135							;;;;  end game vblank logic
-    279  f135
-    280  f135							;;;; Wait for rest of VBLANK
-    281  f135				   .VblankWaitLoop
-    282  f135		       ad 84 02 	      lda	INTIM	; load timer interrupt
-    283  f138		       d0 fb		      bne	.VblankWaitLoop
-    284  f13a		       85 02		      sta	WSYNC	; wait for next wsync
-    285  f13c		       85 01		      sta	VBLANK	; turn off VBlank
-    286  f13e
-    287  f13e							;;;; kernel (192 visible scan lines)
-    288  f13e							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    289  f13e		       a0 0e		      ldy	#14
-    290  f140							;;; display 14 rows of "score"
-    291  f140				   .ScrollLoop
-    292  f140		       85 02		      sta	WSYNC	; 3| 0
-    293  f142		       b1 a0		      lda	(LeftScorePtr0),Y	; 5| 5 PF0 is single digit
-    294  f144		       85 0d		      sta	PF0	; 3| 8
-    295  f146		       b1 a2		      lda	(LeftScorePtr1),Y	; 4|12
-    296  f148		       11 a4		      ora	(LeftScorePtr2),Y	; 5|17
-    297  f14a		       85 0e		      sta	PF1	; 3|20
-    298  f14c		       b1 a6		      lda	(LeftScorePtr3),Y	; 5|25
-    299  f14e		       11 a8		      ora	(LeftScorePtr4),Y	; 5|30
-    300  f150		       85 0f		      sta	PF2	; 3|33
-    301  f152		       b1 aa		      lda	(LeftScorePtr5),Y	; 5|38
-    302  f154		       85 0d		      sta	PF0	; 3|41
-    303  f156							;; need to redo counts
-    304  f156							;	lda (ScrollPtr6),Y	; 5|46
-    305  f156							;	ora (ScrollPtr7),Y	; 5|51
-    306  f156		       a9 00		      lda	#0
-    307  f158		       85 0e		      sta	PF1	; 3|54
-    308  f15a		       b1 ac		      lda	(RightScorePtr0),Y	; 5|59
-    309  f15c		       11 ae		      ora	(RightScorePtr1),Y	; 5|64
-    310  f15e		       85 0f		      sta	PF2	; 3|67
-    311  f160		       88		      dey		; 2|69
-    312  f161		       d0 dd		      bne	.ScrollLoop	; 3|75/76
-    313  f163
-    314  f163							;;; one more black line before moving to play area
-    315  f163		       85 02		      sta	WSYNC
-    316  f165		       a0 b1		      ldy	#177	; counter
-    317  f167		       a2 00		      ldx	#0	; first GRP0 should be 0
-    318  f169				   .LoopVisible
-    319  f169							;;; for rainbow background
-    320  f169		       86 1b		      stx	GRP0	; 3 (calculated on previous line)
-    321  f16b		       84 09		      sty	COLUBK	; set bg color to loop var
-    322  f16d
-    323  f16d							;;; draw P0
-    324  f16d		       38		      sec		; 2 set carry
-    325  f16e		       98		      tya		; 2
-    326  f16f		       e5 81		      sbc	P0y	; 3
-    327  f171		       65 09		      adc	P0HEIGHT	; 2
-    328  f173		       b0 05		      bcs	.DrawP0
-    329  f175
-    330  f175		       ea		      nop		; 2
-    331  f176		       ea		      nop		; 2
-    332  f177		       38		      sec		; 2
-    333  f178		       b0 03		      bcs	.NoDrawP0	; 3
-    334  f17a				   .DrawP0
-    335  f17a		       b1 82		      lda	(P0spritePtr),Y	; 5
-    336  f17c		       aa		      tax
-    337  f17d				   .NoDrawP0
-    338  f17d
-    339  f17d		       85 02		      sta	WSYNC	; wait for next scanline
-    340  f17f		       88		      dey		; y--
-    341  f180		       d0 e7		      bne	.LoopVisible	; go back until x = 0
-    342  f182							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    343  f182							;;;; end kernel
-    344  f182
-    345  f182							;;;; set timer for OVERSCAN
-    346  f182		       a9 02		      lda	#2
-    347  f184		       85 02		      sta	WSYNC
-    348  f186		       85 01		      sta	VBLANK
-    349  f188		       a9 24		      lda	#36
-    350  f18a		       8d 96 02 	      sta	TIM64T
-    351  f18d
-    352  f18d							;;;;  start game overscan logic
-    353  f18d							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    354  f18d							;;; cycle the Random a tick
-    355  f18d		       20 21 f3 	      jsr	Random
-    356  f190
-    357  f190							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    358  f190							;;;;  end game overscan logic
-    359  f190
-    360  f190
-    361  f190							;;;; Wait for rest of OVERSCAN
-    362  f190				   .OverscanWaitLoop
-    363  f190		       ad 84 02 	      lda	INTIM
-    364  f193		       d0 fb		      bne	.OverscanWaitLoop
-    365  f195		       a9 02		      lda	#2
-    366  f197		       85 02		      sta	WSYNC
-    367  f199
-    368  f199							;;; new frame
-    369  f199		       4c 56 f0 	      jmp	StartFrame
-    370  f19c
-    371  f19c							;;;;	start subroutines
-    372  f19c							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    373  f19c							;;; Load Score Pointers based on corresponding values
-    374  f19c
-    375  f19c				   ConsumeTime SUBROUTINE
-    376  f19c		       a5 01		      lda	ST_TIMECOUNT	; check if TIMECOUNT bit
-    377  f19e		       24 8a		      bit	GameState	; is set in GameState
-    378  f1a0		       d0 01		      bne	UseTime
-    379  f1a2		       60		      rts
-    380  f1a3				   UseTime
-    381  f1a3		       f8		      sed
-    382  f1a4		       38		      sec
-    383  f1a5		       a5 84		      lda	P0time0
-    384  f1a7		       e9 01		      sbc	#1
-    385  f1a9		       85 84		      sta	P0time0
-    386  f1ab		       a5 85		      lda	P0time1
-    387  f1ad		       e9 00		      sbc	#0
-    388  f1af		       85 85		      sta	P0time1
-    389  f1b1		       d8		      cld
-    390  f1b2		       90 01		      bcc	TimesUp
-    391  f1b4		       60		      rts
-    392  f1b5				   TimesUp
-    393  f1b5							; time's up, set back to 0 and deactivate countdown
-    394  f1b5		       a9 00		      lda	#0
-    395  f1b7		       85 84		      sta	P0time0
-    396  f1b9		       85 85		      sta	P0time1
-    397  f1bb		       a5 0c		      lda	ST_CHECKRST | ST_CHECKSLCT
-    398  f1bd		       85 8a		      sta	GameState
-    399  f1bf		       a9 3a		      lda	#<TimeBitmap
-    400  f1c1		       85 87		      sta	P0bitmap
-    401  f1c3		       ad 4e f4 	      lda	PositionX+2
-    402  f1c6		       85 80		      sta	P0x
-    403  f1c8		       ad 50 f4 	      lda	PositionY
-    404  f1cb		       85 81		      sta	P0y
-    405  f1cd		       60		      rts
-    406  f1ce
-    407  f1ce				   LoadScorePointers SUBROUTINE
-    408  f1ce							; first byte (two digits) of timer
-    409  f1ce		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    410  f1d0		       25 85		      and	P0time1	;
-    411  f1d2		       85 a0		      sta	LeftScorePtr0	; store as is (already x16)
-    412  f1d4
-    413  f1d4		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    414  f1d6		       25 85		      and	P0time1	;
-    415  f1d8		       0a		      asl		;
-    416  f1d9		       0a		      asl		;
-    417  f1da		       0a		      asl		;
-    418  f1db		       0a		      asl		; multiply by 16
-    419  f1dc		       85 a2		      sta	LeftScorePtr1	; store in pointer
-    420  f1de
-    421  f1de							; second byte (two digits) of timer
-    422  f1de		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    423  f1e0		       25 84		      and	P0time0	;
-    424  f1e2		       85 a4		      sta	LeftScorePtr2	; store as is (already x16)
-    425  f1e4
-    426  f1e4		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    427  f1e6		       25 84		      and	P0time0	;
-    428  f1e8		       0a		      asl		;
-    429  f1e9		       0a		      asl		;
-    430  f1ea		       0a		      asl		;
-    431  f1eb		       0a		      asl		; multiply by 16
-    432  f1ec		       85 a6		      sta	LeftScorePtr3	; store in pointer
-    433  f1ee
-    434  f1ee		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    435  f1f0		       25 88		      and	LeftScore4	; load the digit
-    436  f1f2		       0a		      asl		;
-    437  f1f3		       0a		      asl		;
-    438  f1f4		       0a		      asl		;
-    439  f1f5		       0a		      asl		; multiply by 16
-    440  f1f6		       85 a8		      sta	LeftScorePtr4	; Put in LSB of ScrollPtr
-    441  f1f8
-    442  f1f8							; delay time countdown (MSB only)
-    443  f1f8		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    444  f1fa		       25 8b		      and	DelayTime	; load the digit
-    445  f1fc		       85 aa		      sta	LeftScorePtr5	; store as is (already x16)
-    446  f1fe
-    447  f1fe							; score digits
-    448  f1fe		       a9 f0		      lda	#%11110000	; mask for first decimal digit
-    449  f200		       25 86		      and	P0score	;
-    450  f202		       85 ac		      sta	RightScorePtr0	; store as is (already x16)
-    451  f204
-    452  f204		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
-    453  f206		       25 86		      and	P0score	;
-    454  f208		       0a		      asl		;
-    455  f209		       0a		      asl		;
-    456  f20a		       0a		      asl		;
-    457  f20b		       0a		      asl		; multiply by 16
-    458  f20c		       85 ae		      sta	RightScorePtr1	; store in pointer
-    459  f20e
-    460  f20e		       60		      rts
-    461  f20f
-    462  f300		       00 00 00 00*	      align	256	; PosObject is timing dependent and can't cross page boundaries
-    463  f300							;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
-    464  f300							; Positions an object horizontally
-    465  f300							; Inputs: A = Desired position.
-    466  f300							; X = Desired object to be positioned (0-5). *jh* (P0, P1, M0, M1, Ball)
-    467  f300							; scanlines: If control comes on or before cycle 73 then 1 scanline is consumed.
-    468  f300							; If control comes after cycle 73 then 2 scanlines are consumed.
-    469  f300							; Outputs: X = unchanged
-    470  f300							; A = Fine Adjustment value.
-    471  f300							; Y = the "remainder" of the division by 15 minus an additional 15.
-    472  f300							; control is returned on cycle 6 of the next scanline.
-    473  f300				   PosObject  SUBROUTINE
-    474  f300
-    475  f300		       85 02		      STA	WSYNC	; 00 Sync to start of scanline.
-    476  f302		       38		      SEC		; 02 Set the carry flag so no borrow will be applied during the division.
-    477  f303				   .divideby15
-    478  f303		       e9 0f		      SBC	#15	; 04 ; Waste the necessary amount of time dividing X-pos by 15!
-    479  f305		       b0 fc		      BCS	.divideby15	; 06/07 - 11/16/21/26/31/36/41/46/51/56/61/66
-    480  f307
-    481  f307		       a8		      TAY		; 08 ; At this point the value in A is -1 to -15. In this code I use a table
-    482  f308							; to quickly convert that value to the fine adjust value needed.
-    483  f308		       b9 21 f2 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
-    484  f30b							; In your own code you may wish to consume only 4.
-    485  f30b		       95 20		      STA	HMP0,X	; 17 Store the fine adjustment value.
-    486  f30d		       95 10		      STA	RESP0,X	; 21/ 26/31/36/41/46/51/56/61/66/71 - Set the rough position.
-    487  f30f
-    488  f30f		       85 02		      STA	WSYNC
-    489  f311		       60		      RTS
-    490  f312
-    491  f312							;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
-    492  f312							;;; (see link for alternate way without lookup table)
-    493  f312
-    494  f312							;;; fine adjustment for PosObject
-    495  f312							;;; some explanation on "negative index" is here:
-    496  f312							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
-    497  f312
-    498  f312				   fineAdjustBegin
-    499  f312		       70		      DC.B	%01110000	; Left 7
-    500  f313		       60		      DC.B	%01100000	; Left 6
-    501  f314		       50		      DC.B	%01010000	; Left 5
-    502  f315		       40		      DC.B	%01000000	; Left 4
-    503  f316		       30		      DC.B	%00110000	; Left 3
-    504  f317		       20		      DC.B	%00100000	; Left 2
-    505  f318		       10		      DC.B	%00010000	; Left 1
-    506  f319		       00		      DC.B	%00000000	; No movement.
-    507  f31a		       f0		      DC.B	%11110000	; Right 1
-    508  f31b		       e0		      DC.B	%11100000	; Right 2
-    509  f31c		       d0		      DC.B	%11010000	; Right 3
-    510  f31d		       c0		      DC.B	%11000000	; Right 4
-    511  f31e		       b0		      DC.B	%10110000	; Right 5
-    512  f31f		       a0		      DC.B	%10100000	; Right 6
-    513  f320		       90		      DC.B	%10010000	; Right 7
-    514  f320		       f2 21	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
-    515  f321
-    516  f321							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
-    517  f321				   Random
-    518  f321		       a5 8c		      lda	Rand8
-    519  f323		       4a		      lsr
-    520  f324		       90 02		      bcc	noeor
-    521  f326		       49 b4		      eor	#$B4
-    522  f328				   noeor
-    523  f328		       85 8c		      sta	Rand8
-    524  f32a		       60		      rts
-    525  f32b
-    526  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    527  f32b							;;;;	end subroutines
-    528  f32b
-    529  f32b							;;;;  start ROM lookup tables
-    530  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    531  f400		       00 00 00 00*	      align	256
-    532  f400				   BitmapIndex
-    533  f400		       04		      byte.b	#<Lbitmap
-    534  f401		       0d		      byte.b	#<Rbitmap
-    535  f402		       1f		      byte.b	#<Ubitmap
-    536  f403		       16		      byte.b	#<Dbitmap
-    537  f404
-    538  f404				   BitmapTable
-    539  f404				   Lbitmap
-    540  f404		       00		      byte.b	#%00000000
-    541  f405		       10		      byte.b	#%00010000
-    542  f406		       30		      byte.b	#%00110000
-    543  f407		       7f		      byte.b	#%01111111
-    544  f408		       ff		      byte.b	#%11111111
-    545  f409		       7f		      byte.b	#%01111111
-    546  f40a		       30		      byte.b	#%00110000
-    547  f40b		       10		      byte.b	#%00010000
-    548  f40c		       00		      byte.b	#%00000000
-    549  f40d
-    550  f40d				   Rbitmap
-    551  f40d		       00		      byte.b	#%00000000
-    552  f40e		       08		      byte.b	#%00001000
-    553  f40f		       0c		      byte.b	#%00001100
-    554  f410		       fe		      byte.b	#%11111110
-    555  f411		       ff		      byte.b	#%11111111
-    556  f412		       fe		      byte.b	#%11111110
-    557  f413		       0c		      byte.b	#%00001100
-    558  f414		       08		      byte.b	#%00001000
-    559  f415		       00		      byte.b	#%00000000
-    560  f416
-    561  f416				   Dbitmap
-    562  f416		       00		      byte.b	#%00000000
-    563  f417		       10		      byte.b	#%00010000
-    564  f418		       38		      byte.b	#%00111000
-    565  f419		       7c		      byte.b	#%01111100
-    566  f41a		       fe		      byte.b	#%11111110
-    567  f41b		       38		      byte.b	#%00111000
-    568  f41c		       38		      byte.b	#%00111000
-    569  f41d		       38		      byte.b	#%00111000
-    570  f41e		       00		      byte.b	#%00000000
-    571  f41f
-    572  f41f				   Ubitmap
-    573  f41f		       00		      byte.b	#%00000000
-    574  f420		       38		      byte.b	#%00111000
-    575  f421		       38		      byte.b	#%00111000
-    576  f422		       38		      byte.b	#%00111000
-    577  f423		       fe		      byte.b	#%11111110
-    578  f424		       7c		      byte.b	#%01111100
-    579  f425		       38		      byte.b	#%00111000
-    580  f426		       10		      byte.b	#%00010000
-    581  f427		       00		      byte.b	#%00000000
-    582  f428
-    583  f428				   Xbitmap
-    584  f428		       00		      byte.b	#%00000000
-    585  f429		       82		      byte.b	#%10000010
-    586  f42a		       44		      byte.b	#%01000100
-    587  f42b		       28		      byte.b	#%00101000
-    588  f42c		       10		      byte.b	#%00010000
-    589  f42d		       28		      byte.b	#%00101000
-    590  f42e		       44		      byte.b	#%01000100
-    591  f42f		       82		      byte.b	#%10000010
-    592  f430		       00		      byte.b	#%00000000
-    593  f431
-    594  f431				   NullBitmap
-    595  f431		       00		      byte.b	#%00000000
-    596  f432		       00		      byte.b	#%00000000
-    597  f433		       00		      byte.b	#%00000000
-    598  f434		       00		      byte.b	#%00000000
-    599  f435		       00		      byte.b	#%00000000
-    600  f436		       00		      byte.b	#%00000000
-    601  f437		       00		      byte.b	#%00000000
-    602  f438		       00		      byte.b	#%00000000
-    603  f439		       00		      byte.b	#%00000000
-    604  f43a
-    605  f43a				   TimeBitmap
-    606  f43a		       00		      byte.b	#%00000000
-    607  f43b		       ff		      byte.b	#%11111111
-    608  f43c		       5a		      byte.b	#%01011010
-    609  f43d		       24		      byte.b	#%00100100
-    610  f43e		       18		      byte.b	#%00011000
-    611  f43f		       24		      byte.b	#%00100100
-    612  f440		       42		      byte.b	#%01000010
-    613  f441		       ff		      byte.b	#%11111111
-    614  f442		       00		      byte.b	#%00000000
-    615  f443
-    616  f443				   P0color
-    617  f443		       00		      byte.b	#$00
-    618  f444		       00		      byte.b	#$00
-    619  f445		       00		      byte.b	#$00
-    620  f446		       00		      byte.b	#$00
-    621  f447		       00		      byte.b	#$00
-    622  f448		       00		      byte.b	#$00
-    623  f449		       00		      byte.b	#$00
-    624  f44a		       00		      byte.b	#$00
-    625  f44b		       00		      byte.b	#$00
-    626  f44c
-    627  f44c							;;; X and Y location per directional icon
-    628  f44c				   PositionX
-    629  f44c		       35		      byte.b	#53	; left
-    630  f44d		       6b		      byte.b	#107	; right
-    631  f44e		       50		      byte.b	#80	; up
-    632  f44f		       50		      byte.b	#80	; down
-    633  f450
-    634  f450				   PositionY
-    635  f450		       5d		      byte.b	#93	; left (177/2 - 9/2)
-    636  f451		       5d		      byte.b	#93	; right
-    637  f452		       80		      byte.b	#128	; up
-    638  f453		       3b		      byte.b	#59	; down
-    639  f454
-    640  f454							;;; digits.h should set digitTable at the beginning followed by
-    641  f454							;;;	      an array of 16 bytes for each digit 0-9
+     64  f00b
+     65  f00b							;;;;  start variable initialization
+     66  f00b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     67  f00b							;;; initialize Random seed
+     68  f00b		       ad 84 02 	      lda	INTIM	; unknown from timer
+     69  f00e		       05 01		      ora	$1	; can't be zero
+     70  f010		       85 8c		      sta	Rand8
+     71  f012							;;; Set initial P0bitmap to Up
+     72  f012		       a9 1f		      lda	#<Ubitmap
+     73  f014		       85 87		      sta	P0bitmap
+     74  f016							;;; player coordinates (match bitmap above)
+     75  f016		       ad 4e f4 	      lda	PositionX+2
+     76  f019		       85 80		      sta	P0x
+     77  f01b		       ad 52 f4 	      lda	PositionY+2
+     78  f01e		       85 81		      sta	P0y
+     79  f020							;;; Set high byte of P0spritePtr (low byte updated per frame)
+     80  f020		       a9 f4		      lda	#>BitmapTable
+     81  f022		       85 83		      sta	P0spriteHi
+     82  f024							;;; set timer to 1000 (decimal)
+     83  f024		       a9 00		      lda	#0
+     84  f026		       85 84		      sta	P0time0
+     85  f028		       a9 10		      lda	#$10
+     86  f02a		       85 85		      sta	P0time1
+     87  f02c
+     88  f02c							;;; check input but don't consume time
+     89  f02c		       a5 0a		      lda	ST_GAMEINPUT | ST_CHECKSLCT
+     90  f02e		       85 8a		      sta	GameState
+     91  f030
+     92  f030							;;; Set Score Digits
+     93  f030		       a9 0a		      lda	#$0a	; blank
+     94  f032		       85 88		      sta	LeftScore4
+     95  f034		       85 89		      sta	LeftScore5
+     96  f036
+     97  f036							;;; set up Score pointer high bytes
+     98  f036		       a9 f8		      lda	#>digitTableLeftRev
+     99  f038		       85 a1		      sta	LeftScorePtr0+1
+    100  f03a		       85 a9		      sta	LeftScorePtr4+1
+    101  f03c		       85 ab		      sta	LeftScorePtr5+1
+    102  f03e		       85 af		      sta	RightScorePtr1+1
+    103  f040		       a9 f6		      lda	#>digitTableLeft
+    104  f042		       85 a3		      sta	LeftScorePtr1+1
+    105  f044		       a9 f5		      lda	#>digitTableRight
+    106  f046		       85 a5		      sta	LeftScorePtr2+1
+    107  f048		       a9 f7		      lda	#>digitTableRightRev
+    108  f04a		       85 a7		      sta	LeftScorePtr3+1
+    109  f04c		       85 ad		      sta	RightScorePtr0+1
+    110  f04e
+    111  f04e							;;; register setup
+    112  f04e							; playfield color
+    113  f04e		       a9 37		      lda	#55
+    114  f050		       85 08		      sta	COLUPF
+    115  f052							; player/missile size register
+    116  f052		       a5 00		      lda	%00000000	; one player, single-sized
+    117  f054							;lda %00000101    ; one player, double-sized
+    118  f054							;lda %00000111    ; one player, quad-sized
+    119  f054		       85 04		      sta	NUSIZ0
+    120  f056							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    121  f056							;;;;  end variable initialization
+    122  f056
+    123  f056				   StartFrame
+    124  f056		       a9 02		      lda	#2
+    125  f058		       85 00		      sta	VSYNC
+    126  f05a
+    127  f05a							;;; 3 lines of VSYNC
+    128  f05a		       85 02		      sta	WSYNC	; store halts until scanline complete
+    129  f05c		       85 02		      sta	WSYNC	; 2nd
+    130  f05e		       85 02		      sta	WSYNC	; 3rd
+    131  f060
+    132  f060							;;;; set timer for VBLANK
+    133  f060		       a9 2c		      LDA	#44
+    134  f062		       8d 96 02 	      STA	TIM64T
+    135  f065
+    136  f065		       a9 00		      lda	#0
+    137  f067		       85 00		      sta	VSYNC	; turn off VSYNC
+    138  f069
+    139  f069							;;;;  start game vblank logic
+    140  f069							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    141  f069
+    142  f069							;;; Consume Time
+    143  f069		       20 cf f1 	      jsr	ConsumeTime
+    144  f06c							;;; check if open for input
+    145  f06c		       a5 02		      lda	ST_GAMEINPUT
+    146  f06e		       24 8a		      bit	GameState
+    147  f070		       f0 03		      beq	NotActive
+    148  f072		       4c 96 f0 	      jmp	CheckInput
+    149  f075							;;; not active so check if time to activate
+    150  f075				   NotActive
+    151  f075		       a5 8b		      lda	DelayTime
+    152  f077		       f0 1a		      beq	NoNewBitmap	; already zero
+    153  f079		       38		      sec
+    154  f07a		       e9 01		      sbc	#1
+    155  f07c		       85 8b		      sta	DelayTime
+    156  f07e		       d0 13		      bne	NoNewBitmap
+    157  f080				   NewBitmap
+    158  f080		       20 21 f3 	      jsr	Random	; get a random #
+    159  f083		       29 03		      and	#%00000011	; truncate to 2 bits
+    160  f085		       a8		      tay		; put in Y
+    161  f086		       18		      clc
+    162  f087		       b9 00 f4 	      lda	BitmapIndex,Y
+    163  f08a		       85 87		      sta	P0bitmap
+    164  f08c		       20 ab f1 	      jsr	SetPosition
+    165  f08f				   SetActive
+    166  f08f							; set Active
+    167  f08f		       a5 03		      lda	ST_GAMEINPUT | ST_TIMECOUNT
+    168  f091		       85 8a		      sta	GameState
+    169  f093				   NoNewBitmap
+    170  f093		       4c e9 f0 	      jmp	EndP0Input
+    171  f096
+    172  f096							;;; check input signals
+    173  f096				   CheckInput
+    174  f096		       a2 31		      ldx	#<NullBitmap
+    175  f098				   CheckP0Up
+    176  f098		       a9 10		      lda	#%00010000
+    177  f09a		       2c 80 02 	      bit	SWCHA
+    178  f09d		       d0 02		      bne	CheckP0Down
+    179  f09f		       a2 1f		      ldx	#<Ubitmap
+    180  f0a1				   CheckP0Down
+    181  f0a1		       a9 20		      lda	#%00100000
+    182  f0a3		       2c 80 02 	      bit	SWCHA
+    183  f0a6		       d0 02		      bne	CheckP0Right
+    184  f0a8		       a2 16		      ldx	#<Dbitmap
+    185  f0aa				   CheckP0Right
+    186  f0aa		       a9 80		      lda	#%10000000
+    187  f0ac		       2c 80 02 	      bit	SWCHA
+    188  f0af		       d0 02		      bne	CheckP0Left
+    189  f0b1		       a2 0d		      ldx	#<Rbitmap
+    190  f0b3				   CheckP0Left
+    191  f0b3		       a9 40		      lda	#%01000000
+    192  f0b5		       2c 80 02 	      bit	SWCHA
+    193  f0b8		       d0 02		      bne	EndP0InputCheck
+    194  f0ba		       a2 04		      ldx	#<Lbitmap
+    195  f0bc				   EndP0InputCheck
+    196  f0bc
+    197  f0bc							;;; do input-related processing
+    198  f0bc				   CheckInputCorrect
+    199  f0bc		       e0 31		      cpx	#<NullBitmap	; if x hasn't changed
+    200  f0be		       f0 29		      beq	EndP0Input	; we didn't get input
+    201  f0c0		       a9 00		      lda	#0	; if we did get input
+    202  f0c2		       85 8a		      sta	GameState	; stop time counter and input checking
+    203  f0c4		       e4 87		      cpx	P0bitmap	; check if input matches icon
+    204  f0c6		       d0 10		      bne	P0Incorrect
+    205  f0c8				   P0Correct
+    206  f0c8							; increment (decimal) score
+    207  f0c8		       18		      clc
+    208  f0c9		       a5 86		      lda	P0score
+    209  f0cb		       f8		      sed
+    210  f0cc		       69 01		      adc	#1
+    211  f0ce		       85 86		      sta	P0score
+    212  f0d0		       d8		      cld
+    213  f0d1							; set bitmap to null
+    214  f0d1		       a9 31		      lda	#<NullBitmap
+    215  f0d3		       85 87		      sta	P0bitmap
+    216  f0d5		       4c e0 f0 	      jmp	SetDelay
+    217  f0d8				   P0Incorrect
+    218  f0d8		       a9 28		      lda	#<Xbitmap	; set bitmap to X
+    219  f0da		       85 87		      sta	P0bitmap
+    220  f0dc		       a5 01		      lda	ST_TIMECOUNT	; time active, input not
+    221  f0de		       85 8a		      sta	GameState
+    222  f0e0				   SetDelay
+    223  f0e0							; set a random delay
+    224  f0e0		       20 21 f3 	      jsr	Random
+    225  f0e3		       29 3f		      and	#%00111111	; max 127 (around 2.5 second)
+    226  f0e5		       09 08		      ora	#%00001000	; min 32 (a little more than 1/2 second)
+    227  f0e7		       85 8b		      sta	DelayTime
+    228  f0e9				   EndP0Input
+    229  f0e9							; check for game switches
+    230  f0e9							; (subroutines know if input being accepted in current state)
+    231  f0e9		       20 70 f1 	      jsr	ResetCheck
+    232  f0ec		       20 81 f1 	      jsr	SelectCheck
+    233  f0ef							;;; end of input processing
+    234  f0ef
+    235  f0ef
+    236  f0ef							;;; P0 horizontal position
+    237  f0ef		       a2 00		      ldx	#0
+    238  f0f1		       a5 80		      lda	P0x
+    239  f0f3		       20 00 f3 	      jsr	PosObject
+    240  f0f6							;;; P0 vertical position
+    241  f0f6		       a5 87		      lda	P0bitmap	; bitmap base
+    242  f0f8		       18		      clc		; clear carry for add
+    243  f0f9		       69 09		      adc	#P0HEIGHT	; bitmap high end
+    244  f0fb		       38		      sec		; set carry for subtract
+    245  f0fc		       e5 81		      sbc	P0y	; offset by P0y for draw logic
+    246  f0fe		       85 82		      sta	P0spritePtr	; store in sprite pointer
+    247  f100		       a9 f4		      lda	#>BitmapTable	; load 2nd byte of bitmap table
+    248  f102		       e9 00		      sbc	#0	; subtract 0 (decrements if carry is clear from previous)
+    249  f104		       85 83		      sta	P0spritePtr+1	; store in high byte of sprite pointer
+    250  f106
+    251  f106							;;; Setup score pointers for display
+    252  f106		       20 01 f2 	      jsr	LoadScorePointers
+    253  f109
+    254  f109							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    255  f109							;;;;  end game vblank logic
+    256  f109
+    257  f109							;;;; Wait for rest of VBLANK
+    258  f109				   .VblankWaitLoop
+    259  f109		       ad 84 02 	      lda	INTIM	; load timer interrupt
+    260  f10c		       d0 fb		      bne	.VblankWaitLoop
+    261  f10e		       85 02		      sta	WSYNC	; wait for next wsync
+    262  f110		       85 01		      sta	VBLANK	; turn off VBlank
+    263  f112
+    264  f112							;;;; kernel (192 visible scan lines)
+    265  f112							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    266  f112		       a0 0e		      ldy	#14
+    267  f114							;;; display 14 rows of "score"
+    268  f114				   .ScrollLoop
+    269  f114		       85 02		      sta	WSYNC	; 3| 0
+    270  f116		       b1 a0		      lda	(LeftScorePtr0),Y	; 5| 5 PF0 is single digit
+    271  f118		       85 0d		      sta	PF0	; 3| 8
+    272  f11a		       b1 a2		      lda	(LeftScorePtr1),Y	; 4|12
+    273  f11c		       11 a4		      ora	(LeftScorePtr2),Y	; 5|17
+    274  f11e		       85 0e		      sta	PF1	; 3|20
+    275  f120		       b1 a6		      lda	(LeftScorePtr3),Y	; 5|25
+    276  f122		       11 a8		      ora	(LeftScorePtr4),Y	; 5|30
+    277  f124		       85 0f		      sta	PF2	; 3|33
+    278  f126		       b1 aa		      lda	(LeftScorePtr5),Y	; 5|38
+    279  f128		       85 0d		      sta	PF0	; 3|41
+    280  f12a							;; need to redo counts
+    281  f12a							;	lda (ScrollPtr6),Y	; 5|46
+    282  f12a							;	ora (ScrollPtr7),Y	; 5|51
+    283  f12a		       a9 00		      lda	#0
+    284  f12c		       85 0e		      sta	PF1	; 3|54
+    285  f12e		       b1 ac		      lda	(RightScorePtr0),Y	; 5|59
+    286  f130		       11 ae		      ora	(RightScorePtr1),Y	; 5|64
+    287  f132		       85 0f		      sta	PF2	; 3|67
+    288  f134		       88		      dey		; 2|69
+    289  f135		       d0 dd		      bne	.ScrollLoop	; 3|75/76
+    290  f137
+    291  f137							;;; one more black line before moving to play area
+    292  f137		       85 02		      sta	WSYNC
+    293  f139		       a0 b1		      ldy	#177	; counter
+    294  f13b		       a2 00		      ldx	#0	; first GRP0 should be 0
+    295  f13d				   .LoopVisible
+    296  f13d							;;; for rainbow background
+    297  f13d		       86 1b		      stx	GRP0	; 3 (calculated on previous line)
+    298  f13f		       84 09		      sty	COLUBK	; set bg color to loop var
+    299  f141
+    300  f141							;;; draw P0
+    301  f141		       38		      sec		; 2 set carry
+    302  f142		       98		      tya		; 2
+    303  f143		       e5 81		      sbc	P0y	; 3
+    304  f145		       65 09		      adc	P0HEIGHT	; 2
+    305  f147		       b0 05		      bcs	.DrawP0
+    306  f149
+    307  f149		       ea		      nop		; 2
+    308  f14a		       ea		      nop		; 2
+    309  f14b		       38		      sec		; 2
+    310  f14c		       b0 03		      bcs	.NoDrawP0	; 3
+    311  f14e				   .DrawP0
+    312  f14e		       b1 82		      lda	(P0spritePtr),Y	; 5
+    313  f150		       aa		      tax
+    314  f151				   .NoDrawP0
+    315  f151
+    316  f151		       85 02		      sta	WSYNC	; wait for next scanline
+    317  f153		       88		      dey		; y--
+    318  f154		       d0 e7		      bne	.LoopVisible	; go back until x = 0
+    319  f156							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    320  f156							;;;; end kernel
+    321  f156
+    322  f156							;;;; set timer for OVERSCAN
+    323  f156		       a9 02		      lda	#2
+    324  f158		       85 02		      sta	WSYNC
+    325  f15a		       85 01		      sta	VBLANK
+    326  f15c		       a9 24		      lda	#36
+    327  f15e		       8d 96 02 	      sta	TIM64T
+    328  f161
+    329  f161							;;;;  start game overscan logic
+    330  f161							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    331  f161							;;; cycle the Random a tick
+    332  f161		       20 21 f3 	      jsr	Random
+    333  f164
+    334  f164							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    335  f164							;;;;  end game overscan logic
+    336  f164
+    337  f164
+    338  f164							;;;; Wait for rest of OVERSCAN
+    339  f164				   .OverscanWaitLoop
+    340  f164		       ad 84 02 	      lda	INTIM
+    341  f167		       d0 fb		      bne	.OverscanWaitLoop
+    342  f169		       a9 02		      lda	#2
+    343  f16b		       85 02		      sta	WSYNC
+    344  f16d
+    345  f16d							;;; new frame
+    346  f16d		       4c 56 f0 	      jmp	StartFrame
+    347  f170
+    348  f170							;;;;	start subroutines
+    349  f170							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    350  f170							;;; Load Score Pointers based on corresponding values
+    351  f170
+    352  f170				   ResetCheck SUBROUTINE
+    353  f170		       a5 04		      lda	ST_CHECKRST
+    354  f172		       24 8a		      bit	GameState
+    355  f174		       f0 0a		      beq	.end
+    356  f176		       a5 01		      lda	SW_RESET
+    357  f178		       2c 82 02 	      bit	SWCHB
+    358  f17b		       d0 03		      bne	.end
+    359  f17d							; actual RESET behavior
+    360  f17d		       4c 00 f0 	      jmp	Start
+    361  f180				   .end
+    362  f180		       60		      rts
+    363  f181
+    364  f181				   SelectCheck SUBROUTINE
+    365  f181		       a5 08		      lda	ST_CHECKSLCT
+    366  f183		       24 8a		      bit	GameState
+    367  f185		       f0 23		      beq	.end
+    368  f187		       a5 8d		      lda	InputTime
+    369  f189		       f0 05		      beq	.checkselect
+    370  f18b		       c6 8d		      dec	InputTime
+    371  f18d		       4c aa f1 	      jmp	.end
+    372  f190				   .checkselect
+    373  f190		       a5 02		      lda	SW_SELECT
+    374  f192		       2c 82 02 	      bit	SWCHB
+    375  f195		       d0 13		      bne	.end
+    376  f197							; actual SELECT behavior
+    377  f197		       a5 85		      lda	P0time1
+    378  f199		       f8		      sed
+    379  f19a		       18		      clc
+    380  f19b		       69 05		      adc	#5
+    381  f19d		       d8		      cld
+    382  f19e		       c9 30		      cmp	#$30
+    383  f1a0		       d0 02		      bne	.store
+    384  f1a2		       a9 05		      lda	#5
+    385  f1a4				   .store
+    386  f1a4		       85 85		      sta	P0time1
+    387  f1a6		       a9 0f		      lda	#15
+    388  f1a8		       85 8d		      sta	InputTime
+    389  f1aa				   .end
+    390  f1aa		       60		      rts
+    391  f1ab
+    392  f1ab				   SetPosition SUBROUTINE
+    393  f1ab							; Update position
+    394  f1ab		       a9 05		      lda	#5	; starting at 999 so half is roughly 500
+    395  f1ad		       c5 85		      cmp	P0time1
+    396  f1af		       b0 0b		      bcs	.random	; if 5 > P0time1
+    397  f1b1				   .fixed
+    398  f1b1		       b9 4c f4 	      lda	PositionX,Y
+    399  f1b4		       85 80		      sta	P0x
+    400  f1b6		       b9 50 f4 	      lda	PositionY,Y
+    401  f1b9		       85 81		      sta	P0y
+    402  f1bb		       60		      rts
+    403  f1bc				   .random
+    404  f1bc		       20 21 f3 	      jsr	Random
+    405  f1bf		       29 7f		      and	#%01111111	; upper bound 127
+    406  f1c1		       09 10		      ora	#%00010000	; lower bound 16
+    407  f1c3		       85 80		      sta	P0x
+    408  f1c5		       20 21 f3 	      jsr	Random
+    409  f1c8		       29 7f		      and	#%01111111	; upper bound 127
+    410  f1ca		       09 10		      ora	#%00010000	; lower bound 16
+    411  f1cc		       85 81		      sta	P0y
+    412  f1ce		       60		      rts
+    413  f1cf
+    414  f1cf				   ConsumeTime SUBROUTINE
+    415  f1cf		       a5 01		      lda	ST_TIMECOUNT	; check if TIMECOUNT bit
+    416  f1d1		       24 8a		      bit	GameState	; is set in GameState
+    417  f1d3		       d0 01		      bne	UseTime
+    418  f1d5		       60		      rts
+    419  f1d6				   UseTime
+    420  f1d6		       f8		      sed
+    421  f1d7		       38		      sec
+    422  f1d8		       a5 84		      lda	P0time0
+    423  f1da		       e9 01		      sbc	#1
+    424  f1dc		       85 84		      sta	P0time0
+    425  f1de		       a5 85		      lda	P0time1
+    426  f1e0		       e9 00		      sbc	#0
+    427  f1e2		       85 85		      sta	P0time1
+    428  f1e4		       d8		      cld
+    429  f1e5		       90 01		      bcc	TimesUp
+    430  f1e7		       60		      rts
+    431  f1e8				   TimesUp
+    432  f1e8							; time's up, set back to 0 and deactivate countdown
+    433  f1e8		       a9 00		      lda	#0
+    434  f1ea		       85 84		      sta	P0time0
+    435  f1ec		       85 85		      sta	P0time1
+    436  f1ee		       a5 0c		      lda	ST_CHECKRST | ST_CHECKSLCT
+    437  f1f0		       85 8a		      sta	GameState
+    438  f1f2		       a9 3a		      lda	#<TimeBitmap
+    439  f1f4		       85 87		      sta	P0bitmap
+    440  f1f6		       ad 4e f4 	      lda	PositionX+2
+    441  f1f9		       85 80		      sta	P0x
+    442  f1fb		       ad 50 f4 	      lda	PositionY
+    443  f1fe		       85 81		      sta	P0y
+    444  f200		       60		      rts
+    445  f201
+    446  f201				   LoadScorePointers SUBROUTINE
+    447  f201							; first byte (two digits) of timer
+    448  f201		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    449  f203		       25 85		      and	P0time1	;
+    450  f205		       85 a0		      sta	LeftScorePtr0	; store as is (already x16)
+    451  f207
+    452  f207		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    453  f209		       25 85		      and	P0time1	;
+    454  f20b		       0a		      asl		;
+    455  f20c		       0a		      asl		;
+    456  f20d		       0a		      asl		;
+    457  f20e		       0a		      asl		; multiply by 16
+    458  f20f		       85 a2		      sta	LeftScorePtr1	; store in pointer
+    459  f211
+    460  f211							; second byte (two digits) of timer
+    461  f211		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    462  f213		       25 84		      and	P0time0	;
+    463  f215		       85 a4		      sta	LeftScorePtr2	; store as is (already x16)
+    464  f217
+    465  f217		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    466  f219		       25 84		      and	P0time0	;
+    467  f21b		       0a		      asl		;
+    468  f21c		       0a		      asl		;
+    469  f21d		       0a		      asl		;
+    470  f21e		       0a		      asl		; multiply by 16
+    471  f21f		       85 a6		      sta	LeftScorePtr3	; store in pointer
+    472  f221
+    473  f221		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    474  f223		       25 88		      and	LeftScore4	; load the digit
+    475  f225		       0a		      asl		;
+    476  f226		       0a		      asl		;
+    477  f227		       0a		      asl		;
+    478  f228		       0a		      asl		; multiply by 16
+    479  f229		       85 a8		      sta	LeftScorePtr4	; Put in LSB of ScrollPtr
+    480  f22b
+    481  f22b							; delay time countdown (MSB only)
+    482  f22b		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    483  f22d		       25 8b		      and	DelayTime	; load the digit
+    484  f22f		       85 aa		      sta	LeftScorePtr5	; store as is (already x16)
+    485  f231
+    486  f231							; score digits
+    487  f231		       a9 f0		      lda	#%11110000	; mask for first decimal digit
+    488  f233		       25 86		      and	P0score	;
+    489  f235		       85 ac		      sta	RightScorePtr0	; store as is (already x16)
+    490  f237
+    491  f237		       a9 0f		      lda	#%00001111	; mask for 2nd decimal digit
+    492  f239		       25 86		      and	P0score	;
+    493  f23b		       0a		      asl		;
+    494  f23c		       0a		      asl		;
+    495  f23d		       0a		      asl		;
+    496  f23e		       0a		      asl		; multiply by 16
+    497  f23f		       85 ae		      sta	RightScorePtr1	; store in pointer
+    498  f241
+    499  f241		       60		      rts
+    500  f242
+    501  f300		       00 00 00 00*	      align	256	; PosObject is timing dependent and can't cross page boundaries
+    502  f300							;;; PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
+    503  f300							; Positions an object horizontally
+    504  f300							; Inputs: A = Desired position.
+    505  f300							; X = Desired object to be positioned (0-5). *jh* (P0, P1, M0, M1, Ball)
+    506  f300							; scanlines: If control comes on or before cycle 73 then 1 scanline is consumed.
+    507  f300							; If control comes after cycle 73 then 2 scanlines are consumed.
+    508  f300							; Outputs: X = unchanged
+    509  f300							; A = Fine Adjustment value.
+    510  f300							; Y = the "remainder" of the division by 15 minus an additional 15.
+    511  f300							; control is returned on cycle 6 of the next scanline.
+    512  f300				   PosObject  SUBROUTINE
+    513  f300
+    514  f300		       85 02		      STA	WSYNC	; 00 Sync to start of scanline.
+    515  f302		       38		      SEC		; 02 Set the carry flag so no borrow will be applied during the division.
+    516  f303				   .divideby15
+    517  f303		       e9 0f		      SBC	#15	; 04 ; Waste the necessary amount of time dividing X-pos by 15!
+    518  f305		       b0 fc		      BCS	.divideby15	; 06/07 - 11/16/21/26/31/36/41/46/51/56/61/66
+    519  f307
+    520  f307		       a8		      TAY		; 08 ; At this point the value in A is -1 to -15. In this code I use a table
+    521  f308							; to quickly convert that value to the fine adjust value needed.
+    522  f308		       b9 21 f2 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
+    523  f30b							; In your own code you may wish to consume only 4.
+    524  f30b		       95 20		      STA	HMP0,X	; 17 Store the fine adjustment value.
+    525  f30d		       95 10		      STA	RESP0,X	; 21/ 26/31/36/41/46/51/56/61/66/71 - Set the rough position.
+    526  f30f
+    527  f30f		       85 02		      STA	WSYNC
+    528  f311		       60		      RTS
+    529  f312
+    530  f312							;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
+    531  f312							;;; (see link for alternate way without lookup table)
+    532  f312
+    533  f312							;;; fine adjustment for PosObject
+    534  f312							;;; some explanation on "negative index" is here:
+    535  f312							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
+    536  f312
+    537  f312				   fineAdjustBegin
+    538  f312		       70		      DC.B	%01110000	; Left 7
+    539  f313		       60		      DC.B	%01100000	; Left 6
+    540  f314		       50		      DC.B	%01010000	; Left 5
+    541  f315		       40		      DC.B	%01000000	; Left 4
+    542  f316		       30		      DC.B	%00110000	; Left 3
+    543  f317		       20		      DC.B	%00100000	; Left 2
+    544  f318		       10		      DC.B	%00010000	; Left 1
+    545  f319		       00		      DC.B	%00000000	; No movement.
+    546  f31a		       f0		      DC.B	%11110000	; Right 1
+    547  f31b		       e0		      DC.B	%11100000	; Right 2
+    548  f31c		       d0		      DC.B	%11010000	; Right 3
+    549  f31d		       c0		      DC.B	%11000000	; Right 4
+    550  f31e		       b0		      DC.B	%10110000	; Right 5
+    551  f31f		       a0		      DC.B	%10100000	; Right 6
+    552  f320		       90		      DC.B	%10010000	; Right 7
+    553  f320		       f2 21	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
+    554  f321
+    555  f321							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
+    556  f321				   Random
+    557  f321		       a5 8c		      lda	Rand8
+    558  f323		       4a		      lsr
+    559  f324		       90 02		      bcc	noeor
+    560  f326		       49 b4		      eor	#$B4
+    561  f328				   noeor
+    562  f328		       85 8c		      sta	Rand8
+    563  f32a		       60		      rts
+    564  f32b
+    565  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    566  f32b							;;;;	end subroutines
+    567  f32b
+    568  f32b							;;;;  start ROM lookup tables
+    569  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    570  f400		       00 00 00 00*	      align	256
+    571  f400				   BitmapIndex
+    572  f400		       04		      byte.b	#<Lbitmap
+    573  f401		       0d		      byte.b	#<Rbitmap
+    574  f402		       1f		      byte.b	#<Ubitmap
+    575  f403		       16		      byte.b	#<Dbitmap
+    576  f404
+    577  f404				   BitmapTable
+    578  f404				   Lbitmap
+    579  f404		       00		      byte.b	#%00000000
+    580  f405		       10		      byte.b	#%00010000
+    581  f406		       30		      byte.b	#%00110000
+    582  f407		       7f		      byte.b	#%01111111
+    583  f408		       ff		      byte.b	#%11111111
+    584  f409		       7f		      byte.b	#%01111111
+    585  f40a		       30		      byte.b	#%00110000
+    586  f40b		       10		      byte.b	#%00010000
+    587  f40c		       00		      byte.b	#%00000000
+    588  f40d
+    589  f40d				   Rbitmap
+    590  f40d		       00		      byte.b	#%00000000
+    591  f40e		       08		      byte.b	#%00001000
+    592  f40f		       0c		      byte.b	#%00001100
+    593  f410		       fe		      byte.b	#%11111110
+    594  f411		       ff		      byte.b	#%11111111
+    595  f412		       fe		      byte.b	#%11111110
+    596  f413		       0c		      byte.b	#%00001100
+    597  f414		       08		      byte.b	#%00001000
+    598  f415		       00		      byte.b	#%00000000
+    599  f416
+    600  f416				   Dbitmap
+    601  f416		       00		      byte.b	#%00000000
+    602  f417		       10		      byte.b	#%00010000
+    603  f418		       38		      byte.b	#%00111000
+    604  f419		       7c		      byte.b	#%01111100
+    605  f41a		       fe		      byte.b	#%11111110
+    606  f41b		       38		      byte.b	#%00111000
+    607  f41c		       38		      byte.b	#%00111000
+    608  f41d		       38		      byte.b	#%00111000
+    609  f41e		       00		      byte.b	#%00000000
+    610  f41f
+    611  f41f				   Ubitmap
+    612  f41f		       00		      byte.b	#%00000000
+    613  f420		       38		      byte.b	#%00111000
+    614  f421		       38		      byte.b	#%00111000
+    615  f422		       38		      byte.b	#%00111000
+    616  f423		       fe		      byte.b	#%11111110
+    617  f424		       7c		      byte.b	#%01111100
+    618  f425		       38		      byte.b	#%00111000
+    619  f426		       10		      byte.b	#%00010000
+    620  f427		       00		      byte.b	#%00000000
+    621  f428
+    622  f428				   Xbitmap
+    623  f428		       00		      byte.b	#%00000000
+    624  f429		       82		      byte.b	#%10000010
+    625  f42a		       44		      byte.b	#%01000100
+    626  f42b		       28		      byte.b	#%00101000
+    627  f42c		       10		      byte.b	#%00010000
+    628  f42d		       28		      byte.b	#%00101000
+    629  f42e		       44		      byte.b	#%01000100
+    630  f42f		       82		      byte.b	#%10000010
+    631  f430		       00		      byte.b	#%00000000
+    632  f431
+    633  f431				   NullBitmap
+    634  f431		       00		      byte.b	#%00000000
+    635  f432		       00		      byte.b	#%00000000
+    636  f433		       00		      byte.b	#%00000000
+    637  f434		       00		      byte.b	#%00000000
+    638  f435		       00		      byte.b	#%00000000
+    639  f436		       00		      byte.b	#%00000000
+    640  f437		       00		      byte.b	#%00000000
+    641  f438		       00		      byte.b	#%00000000
+    642  f439		       00		      byte.b	#%00000000
+    643  f43a
+    644  f43a				   TimeBitmap
+    645  f43a		       00		      byte.b	#%00000000
+    646  f43b		       ff		      byte.b	#%11111111
+    647  f43c		       5a		      byte.b	#%01011010
+    648  f43d		       24		      byte.b	#%00100100
+    649  f43e		       18		      byte.b	#%00011000
+    650  f43f		       24		      byte.b	#%00100100
+    651  f440		       42		      byte.b	#%01000010
+    652  f441		       ff		      byte.b	#%11111111
+    653  f442		       00		      byte.b	#%00000000
+    654  f443
+    655  f443				   P0color
+    656  f443		       00		      byte.b	#$00
+    657  f444		       00		      byte.b	#$00
+    658  f445		       00		      byte.b	#$00
+    659  f446		       00		      byte.b	#$00
+    660  f447		       00		      byte.b	#$00
+    661  f448		       00		      byte.b	#$00
+    662  f449		       00		      byte.b	#$00
+    663  f44a		       00		      byte.b	#$00
+    664  f44b		       00		      byte.b	#$00
+    665  f44c
+    666  f44c							;;; X and Y location per directional icon
+    667  f44c				   PositionX
+    668  f44c		       35		      byte.b	#53	; left
+    669  f44d		       6b		      byte.b	#107	; right
+    670  f44e		       50		      byte.b	#80	; up
+    671  f44f		       50		      byte.b	#80	; down
+    672  f450
+    673  f450				   PositionY
+    674  f450		       5d		      byte.b	#93	; left (177/2 - 9/2)
+    675  f451		       5d		      byte.b	#93	; right
+    676  f452		       80		      byte.b	#128	; up
+    677  f453		       3b		      byte.b	#59	; down
+    678  f454
+    679  f454							;;; digits.h should set digitTable at the beginning followed by
+    680  f454							;;;	      an array of 16 bytes for each digit 0-9
 ------- FILE digitTableRight.h LEVEL 2 PASS 2
       0  f454					      include	"digitTableRight.h"
       1  f500		       00 00 00 00*	      align	256
@@ -1922,11 +1961,11 @@
     222  f8ce		       00		      .byte.b	%00000000	;|
     223  f8cf		       00		      .byte.b	%00000000	;|
 ------- FILE cart.asm
-    646  f8d0
-    647  f8d0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    648  f8d0							;;;;  end ROM lookup tables
-    649  f8d0
-    650  f8d0							;;; Complete to 4kB
-    651  fffc					      org	$FFFC
-    652  fffc		       00 f0		      .word.w	Start
-    653  fffe		       00 f0		      .word.w	Start
+    685  f8d0
+    686  f8d0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    687  f8d0							;;;;  end ROM lookup tables
+    688  f8d0
+    689  f8d0							;;; Complete to 4kB
+    690  fffc					      org	$FFFC
+    691  fffc		       00 f0		      .word.w	Start
+    692  fffe		       00 f0		      .word.w	Start

@@ -8,6 +8,9 @@ Simple reaction game of finite length.
 * After a short random delay a new arrow appears
 * When time reaches 0 the game is over
 * After roughly half the time has elapsed, the arrow positions become random
+* Time unit is screen cycles (60/second)
+  * Before the game starts, use the select button to add time (max 2500)
+  * Delay between arrows is random between 16 and 127 cycles
 
 # Try it:
 Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.binaryj.net/roms/timesup.bin)
@@ -20,5 +23,9 @@ Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.b
   * nice sound for correct
   * neutral sound when icon pops
 * Game controls:
-  * game select - add time?
   * difficulty - disable random position?
+* Modes/switches:
+  * position
+    * fixed/correlated
+    * fixed/uncorrelated
+    * random

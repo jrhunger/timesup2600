@@ -39,6 +39,7 @@ LeftScore5   byte ; (89) Score Digits
 GameState    byte ; (8a) 
 DelayTime    byte ; (8a) Time left in delay
 Rand8        byte ; (8b) 8-bit random
+InputTime    byte ; (8c) Input re-check delay
 
 ; Top Bar digit pointers
     org $a0
@@ -78,14 +79,14 @@ Start:
 ;;; Set high byte of P0spritePtr (low byte updated per frame)
 	lda #>BitmapTable
 	sta P0spriteHi
-;;; set timer to 999 (decimal)
-    lda #153     ; hex 99
+;;; set timer to 1000 (decimal)
+    lda #0
 	sta P0time0
-	lda #9
+	lda #$10
 	sta P0time1
 
 ;;; check input but don't consume time
-    lda ST_GAMEINPUT
+    lda ST_GAMEINPUT | ST_CHECKSLCT
 	sta GameState
 
 ;;; Set Score Digits
@@ -160,25 +161,7 @@ NewBitmap
 	clc
 	lda BitmapIndex,Y
 	sta P0bitmap
-	; Update position
-	lda #5         ; starting at 999 so half is roughly 500
-	cmp P0time1
-	bcs RandomPosition ; if 5 > P0time1
-FixedPosition:
-    lda PositionX,Y
-	sta P0x
-    lda PositionY,Y
-	sta P0y
-	jmp SetActive
-RandomPosition:
-	jsr Random
-	and #%01111111 ; upper bound 127 
-	ora #%00010000 ; lower bound 16
-	sta P0x
-	jsr Random
-	and #%01111111 ; upper bound 127 
-	ora #%00010000 ; lower bound 16
-	sta P0y
+	jsr SetPosition
 SetActive:	
 	; set Active
 	lda ST_GAMEINPUT | ST_TIMECOUNT
@@ -240,19 +223,13 @@ SetDelay:
 	; set a random delay
 	jsr Random
 	and #%00111111     ; max 127 (around 2.5 second)
-	ora #%00100000     ; min 31 (a little more than 1/2 second)
+	ora #%00001000     ; min 16 (a little more than 1/4 second)
 	sta DelayTime
 EndP0Input:
-; check for reset
-ResetCheck:
-    lda ST_CHECKRST
-	bit GameState
-	beq EndResetCheck
-	lda SW_RESET
-	bit SWCHB
-	bne EndResetCheck
-	jmp Start
-EndResetCheck:
+; check for game switches 
+; (subroutines know if input being accepted in current state)
+    jsr ResetCheck
+    jsr SelectCheck
 ;;; end of input processing	
 
 
@@ -371,6 +348,68 @@ EndResetCheck:
 ;;;;   start subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Load Score Pointers based on corresponding values
+
+ResetCheck SUBROUTINE
+    lda ST_CHECKRST
+	bit GameState
+	beq .end
+	lda SW_RESET
+	bit SWCHB
+	bne .end
+	; actual RESET behavior
+	jmp Start
+.end:
+    rts
+
+SelectCheck SUBROUTINE
+    lda ST_CHECKSLCT
+	bit GameState
+	beq .end
+	lda InputTime
+	beq .checkselect
+	dec InputTime
+	jmp .end
+.checkselect
+	lda SW_SELECT
+	bit SWCHB
+	bne .end
+	; actual SELECT behavior
+    lda P0time1
+	sed
+	clc
+	adc #5
+	cld
+	cmp #$30
+	bne .store
+	lda #5
+.store
+	sta P0time1
+	lda #15
+	sta InputTime
+.end:
+    rts
+
+SetPosition SUBROUTINE	
+	; Update position
+	lda #5         ; starting at 999 so half is roughly 500
+	cmp P0time1
+	bcs .random ; if 5 > P0time1
+.fixed:
+    lda PositionX,Y
+	sta P0x
+    lda PositionY,Y
+	sta P0y
+	rts
+.random:
+	jsr Random
+	and #%01111111 ; upper bound 127 
+	ora #%00010000 ; lower bound 16
+	sta P0x
+	jsr Random
+	and #%01111111 ; upper bound 127 
+	ora #%00010000 ; lower bound 16
+	sta P0y
+	rts
 
 ConsumeTime SUBROUTINE
     lda ST_TIMECOUNT  ; check if TIMECOUNT bit
