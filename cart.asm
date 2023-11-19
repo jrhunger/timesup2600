@@ -139,7 +139,7 @@ StartFrame:
 ;;;;  start game vblank logic
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; Consume Time
+;;; Consume Time if applicable
 	jsr ConsumeTime
 ;;; check if open for input
     lda ST_GAMEINPUT
@@ -222,12 +222,12 @@ P0Incorrect:
 SetDelay:
 	; set a random delay
 	jsr Random
-	and #%00111111     ; max 127 (around 2.5 second)
-	ora #%00001000     ; min 16 (a little more than 1/4 second)
+	and #%00111111     ; max 127 (just over 2 second)
+	ora #%00001000     ; min 16 (around 1/4 second)
 	sta DelayTime
 EndP0Input:
 ; check for game switches 
-; (subroutines know if input being accepted in current state)
+; (subroutines know if input being accepted based on current state)
     jsr ResetCheck
     jsr SelectCheck
 ;;; end of input processing	
@@ -414,9 +414,9 @@ SetPosition SUBROUTINE
 ConsumeTime SUBROUTINE
     lda ST_TIMECOUNT  ; check if TIMECOUNT bit
     bit GameState     ; is set in GameState
-	bne UseTime
+	bne .usetime
 	rts
-UseTime
+.usetime
 	sed
     sec
     lda P0time0
@@ -426,9 +426,9 @@ UseTime
 	sbc #0
 	sta P0time1
 	cld
-	bcc TimesUp
+	bcc .timesup
 	rts
-TimesUp:
+.timesup:
 	; time's up, set back to 0 and deactivate countdown
 	lda #0
 	sta P0time0
@@ -530,35 +530,13 @@ PosObject SUBROUTINE
 ;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
 ;;; (see link for alternate way without lookup table)
 	
-;;; fine adjustment for PosObject
-;;; some explanation on "negative index" is here: 
-;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
-
-fineAdjustBegin
-	DC.B %01110000; Left 7 
-	DC.B %01100000; Left 6
-	DC.B %01010000; Left 5
-	DC.B %01000000; Left 4
-	DC.B %00110000; Left 3
-	DC.B %00100000; Left 2
-	DC.B %00010000; Left 1
-	DC.B %00000000; No movement.
-	DC.B %11110000; Right 1
-	DC.B %11100000; Right 2
-	DC.B %11010000; Right 3
-	DC.B %11000000; Right 4
-	DC.B %10110000; Right 5
-	DC.B %10100000; Right 6
-	DC.B %10010000; Right 7
-fineAdjustTable EQU fineAdjustBegin - %11110001 ; NOTE: %11110001 = -15
-
 ;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
-Random:
+Random SUBROUTINE
     lda Rand8
     lsr
-	bcc noeor
+	bcc .noeor
 	eor #$B4
-noeor:
+.noeor:
     sta Rand8
 	rts
 
@@ -682,6 +660,28 @@ PositionY:
 	include "digitTableLeft.h"
 	include "digitTableRightRev.h"
 	include "digitTableLeftRev.h"
+
+    align 256 ; set on page boundary per timing reasons
+;;; fine adjustment for PosObject
+;;; some explanation on "negative index" is here: 
+;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
+fineAdjustBegin
+	DC.B %01110000; Left 7 
+	DC.B %01100000; Left 6
+	DC.B %01010000; Left 5
+	DC.B %01000000; Left 4
+	DC.B %00110000; Left 3
+	DC.B %00100000; Left 2
+	DC.B %00010000; Left 1
+	DC.B %00000000; No movement.
+	DC.B %11110000; Right 1
+	DC.B %11100000; Right 2
+	DC.B %11010000; Right 3
+	DC.B %11000000; Right 4
+	DC.B %10110000; Right 5
+	DC.B %10100000; Right 6
+	DC.B %10010000; Right 7
+fineAdjustTable EQU fineAdjustBegin - %11110001 ; NOTE: %11110001 = -15
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end ROM lookup tables

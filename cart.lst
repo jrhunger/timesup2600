@@ -534,7 +534,7 @@
     155  f07c		       85 8b		      sta	DelayTime
     156  f07e		       d0 13		      bne	NoNewBitmap
     157  f080				   NewBitmap
-    158  f080		       20 21 f3 	      jsr	Random	; get a random #
+    158  f080		       20 12 f3 	      jsr	Random	; get a random #
     159  f083		       29 03		      and	#%00000011	; truncate to 2 bits
     160  f085		       a8		      tay		; put in Y
     161  f086		       18		      clc
@@ -600,9 +600,9 @@
     221  f0de		       85 8a		      sta	GameState
     222  f0e0				   SetDelay
     223  f0e0							; set a random delay
-    224  f0e0		       20 21 f3 	      jsr	Random
+    224  f0e0		       20 12 f3 	      jsr	Random
     225  f0e3		       29 3f		      and	#%00111111	; max 127 (around 2.5 second)
-    226  f0e5		       09 08		      ora	#%00001000	; min 32 (a little more than 1/2 second)
+    226  f0e5		       09 08		      ora	#%00001000	; min 16 (a little more than 1/4 second)
     227  f0e7		       85 8b		      sta	DelayTime
     228  f0e9				   EndP0Input
     229  f0e9							; check for game switches
@@ -708,7 +708,7 @@
     329  f161							;;;;  start game overscan logic
     330  f161							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     331  f161							;;; cycle the Random a tick
-    332  f161		       20 21 f3 	      jsr	Random
+    332  f161		       20 12 f3 	      jsr	Random
     333  f164
     334  f164							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     335  f164							;;;;  end game overscan logic
@@ -780,11 +780,11 @@
     401  f1b9		       85 81		      sta	P0y
     402  f1bb		       60		      rts
     403  f1bc				   .random
-    404  f1bc		       20 21 f3 	      jsr	Random
+    404  f1bc		       20 12 f3 	      jsr	Random
     405  f1bf		       29 7f		      and	#%01111111	; upper bound 127
     406  f1c1		       09 10		      ora	#%00010000	; lower bound 16
     407  f1c3		       85 80		      sta	P0x
-    408  f1c5		       20 21 f3 	      jsr	Random
+    408  f1c5		       20 12 f3 	      jsr	Random
     409  f1c8		       29 7f		      and	#%01111111	; upper bound 127
     410  f1ca		       09 10		      ora	#%00010000	; lower bound 16
     411  f1cc		       85 81		      sta	P0y
@@ -793,9 +793,9 @@
     414  f1cf				   ConsumeTime SUBROUTINE
     415  f1cf		       a5 01		      lda	ST_TIMECOUNT	; check if TIMECOUNT bit
     416  f1d1		       24 8a		      bit	GameState	; is set in GameState
-    417  f1d3		       d0 01		      bne	UseTime
+    417  f1d3		       d0 01		      bne	.usetime
     418  f1d5		       60		      rts
-    419  f1d6				   UseTime
+    419  f1d6				   .usetime
     420  f1d6		       f8		      sed
     421  f1d7		       38		      sec
     422  f1d8		       a5 84		      lda	P0time0
@@ -805,9 +805,9 @@
     426  f1e0		       e9 00		      sbc	#0
     427  f1e2		       85 85		      sta	P0time1
     428  f1e4		       d8		      cld
-    429  f1e5		       90 01		      bcc	TimesUp
+    429  f1e5		       90 01		      bcc	.timesup
     430  f1e7		       60		      rts
-    431  f1e8				   TimesUp
+    431  f1e8				   .timesup
     432  f1e8							; time's up, set back to 0 and deactivate countdown
     433  f1e8		       a9 00		      lda	#0
     434  f1ea		       85 84		      sta	P0time0
@@ -898,7 +898,7 @@
     519  f307
     520  f307		       a8		      TAY		; 08 ; At this point the value in A is -1 to -15. In this code I use a table
     521  f308							; to quickly convert that value to the fine adjust value needed.
-    522  f308		       b9 21 f2 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
+    522  f308		       b9 0f f8 	      LDA	fineAdjustTable,Y	; 13 -> Consume 5 cycles by guaranteeing we cross a page boundary
     523  f30b							; In your own code you may wish to consume only 4.
     524  f30b		       95 20		      STA	HMP0,X	; 17 Store the fine adjustment value.
     525  f30d		       95 10		      STA	RESP0,X	; 21/ 26/31/36/41/46/51/56/61/66/71 - Set the rough position.
@@ -909,154 +909,132 @@
     530  f312							;;; end PosObject from https://www.biglist.com/lists/stella/archives/200403/msg00260.html
     531  f312							;;; (see link for alternate way without lookup table)
     532  f312
-    533  f312							;;; fine adjustment for PosObject
-    534  f312							;;; some explanation on "negative index" is here:
-    535  f312							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
-    536  f312
-    537  f312				   fineAdjustBegin
-    538  f312		       70		      DC.B	%01110000	; Left 7
-    539  f313		       60		      DC.B	%01100000	; Left 6
-    540  f314		       50		      DC.B	%01010000	; Left 5
-    541  f315		       40		      DC.B	%01000000	; Left 4
-    542  f316		       30		      DC.B	%00110000	; Left 3
-    543  f317		       20		      DC.B	%00100000	; Left 2
-    544  f318		       10		      DC.B	%00010000	; Left 1
-    545  f319		       00		      DC.B	%00000000	; No movement.
-    546  f31a		       f0		      DC.B	%11110000	; Right 1
-    547  f31b		       e0		      DC.B	%11100000	; Right 2
-    548  f31c		       d0		      DC.B	%11010000	; Right 3
-    549  f31d		       c0		      DC.B	%11000000	; Right 4
-    550  f31e		       b0		      DC.B	%10110000	; Right 5
-    551  f31f		       a0		      DC.B	%10100000	; Right 6
-    552  f320		       90		      DC.B	%10010000	; Right 7
-    553  f320		       f2 21	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
-    554  f321
-    555  f321							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
-    556  f321				   Random
-    557  f321		       a5 8c		      lda	Rand8
-    558  f323		       4a		      lsr
-    559  f324		       90 02		      bcc	noeor
-    560  f326		       49 b4		      eor	#$B4
-    561  f328				   noeor
-    562  f328		       85 8c		      sta	Rand8
-    563  f32a		       60		      rts
-    564  f32b
-    565  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    566  f32b							;;;;	end subroutines
-    567  f32b
-    568  f32b							;;;;  start ROM lookup tables
-    569  f32b							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    570  f400		       00 00 00 00*	      align	256
-    571  f400				   BitmapIndex
-    572  f400		       04		      byte.b	#<Lbitmap
-    573  f401		       0d		      byte.b	#<Rbitmap
-    574  f402		       1f		      byte.b	#<Ubitmap
-    575  f403		       16		      byte.b	#<Dbitmap
-    576  f404
-    577  f404				   BitmapTable
-    578  f404				   Lbitmap
-    579  f404		       00		      byte.b	#%00000000
-    580  f405		       10		      byte.b	#%00010000
-    581  f406		       30		      byte.b	#%00110000
-    582  f407		       7f		      byte.b	#%01111111
-    583  f408		       ff		      byte.b	#%11111111
-    584  f409		       7f		      byte.b	#%01111111
-    585  f40a		       30		      byte.b	#%00110000
-    586  f40b		       10		      byte.b	#%00010000
-    587  f40c		       00		      byte.b	#%00000000
-    588  f40d
-    589  f40d				   Rbitmap
-    590  f40d		       00		      byte.b	#%00000000
-    591  f40e		       08		      byte.b	#%00001000
-    592  f40f		       0c		      byte.b	#%00001100
-    593  f410		       fe		      byte.b	#%11111110
-    594  f411		       ff		      byte.b	#%11111111
-    595  f412		       fe		      byte.b	#%11111110
-    596  f413		       0c		      byte.b	#%00001100
-    597  f414		       08		      byte.b	#%00001000
-    598  f415		       00		      byte.b	#%00000000
-    599  f416
-    600  f416				   Dbitmap
-    601  f416		       00		      byte.b	#%00000000
-    602  f417		       10		      byte.b	#%00010000
-    603  f418		       38		      byte.b	#%00111000
-    604  f419		       7c		      byte.b	#%01111100
-    605  f41a		       fe		      byte.b	#%11111110
-    606  f41b		       38		      byte.b	#%00111000
-    607  f41c		       38		      byte.b	#%00111000
-    608  f41d		       38		      byte.b	#%00111000
-    609  f41e		       00		      byte.b	#%00000000
-    610  f41f
-    611  f41f				   Ubitmap
-    612  f41f		       00		      byte.b	#%00000000
-    613  f420		       38		      byte.b	#%00111000
-    614  f421		       38		      byte.b	#%00111000
-    615  f422		       38		      byte.b	#%00111000
-    616  f423		       fe		      byte.b	#%11111110
-    617  f424		       7c		      byte.b	#%01111100
-    618  f425		       38		      byte.b	#%00111000
-    619  f426		       10		      byte.b	#%00010000
-    620  f427		       00		      byte.b	#%00000000
-    621  f428
-    622  f428				   Xbitmap
-    623  f428		       00		      byte.b	#%00000000
-    624  f429		       82		      byte.b	#%10000010
-    625  f42a		       44		      byte.b	#%01000100
-    626  f42b		       28		      byte.b	#%00101000
-    627  f42c		       10		      byte.b	#%00010000
-    628  f42d		       28		      byte.b	#%00101000
-    629  f42e		       44		      byte.b	#%01000100
-    630  f42f		       82		      byte.b	#%10000010
-    631  f430		       00		      byte.b	#%00000000
-    632  f431
-    633  f431				   NullBitmap
-    634  f431		       00		      byte.b	#%00000000
-    635  f432		       00		      byte.b	#%00000000
-    636  f433		       00		      byte.b	#%00000000
-    637  f434		       00		      byte.b	#%00000000
-    638  f435		       00		      byte.b	#%00000000
-    639  f436		       00		      byte.b	#%00000000
-    640  f437		       00		      byte.b	#%00000000
-    641  f438		       00		      byte.b	#%00000000
-    642  f439		       00		      byte.b	#%00000000
-    643  f43a
-    644  f43a				   TimeBitmap
-    645  f43a		       00		      byte.b	#%00000000
-    646  f43b		       ff		      byte.b	#%11111111
-    647  f43c		       5a		      byte.b	#%01011010
-    648  f43d		       24		      byte.b	#%00100100
-    649  f43e		       18		      byte.b	#%00011000
-    650  f43f		       24		      byte.b	#%00100100
-    651  f440		       42		      byte.b	#%01000010
-    652  f441		       ff		      byte.b	#%11111111
-    653  f442		       00		      byte.b	#%00000000
-    654  f443
-    655  f443				   P0color
-    656  f443		       00		      byte.b	#$00
-    657  f444		       00		      byte.b	#$00
-    658  f445		       00		      byte.b	#$00
-    659  f446		       00		      byte.b	#$00
-    660  f447		       00		      byte.b	#$00
-    661  f448		       00		      byte.b	#$00
-    662  f449		       00		      byte.b	#$00
-    663  f44a		       00		      byte.b	#$00
-    664  f44b		       00		      byte.b	#$00
-    665  f44c
-    666  f44c							;;; X and Y location per directional icon
-    667  f44c				   PositionX
-    668  f44c		       35		      byte.b	#53	; left
-    669  f44d		       6b		      byte.b	#107	; right
-    670  f44e		       50		      byte.b	#80	; up
-    671  f44f		       50		      byte.b	#80	; down
-    672  f450
-    673  f450				   PositionY
-    674  f450		       5d		      byte.b	#93	; left (177/2 - 9/2)
-    675  f451		       5d		      byte.b	#93	; right
-    676  f452		       80		      byte.b	#128	; up
-    677  f453		       3b		      byte.b	#59	; down
-    678  f454
-    679  f454							;;; digits.h should set digitTable at the beginning followed by
-    680  f454							;;;	      an array of 16 bytes for each digit 0-9
+    533  f312							;;; Random from https://forums.atariage.com/blogs/entry/11145-step-10-random-numbers/
+    534  f312				   Random     SUBROUTINE
+    535  f312		       a5 8c		      lda	Rand8
+    536  f314		       4a		      lsr
+    537  f315		       90 02		      bcc	.noeor
+    538  f317		       49 b4		      eor	#$B4
+    539  f319				   .noeor
+    540  f319		       85 8c		      sta	Rand8
+    541  f31b		       60		      rts
+    542  f31c
+    543  f31c							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    544  f31c							;;;;	end subroutines
+    545  f31c
+    546  f31c							;;;;  start ROM lookup tables
+    547  f31c							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    548  f400		       00 00 00 00*	      align	256
+    549  f400				   BitmapIndex
+    550  f400		       04		      byte.b	#<Lbitmap
+    551  f401		       0d		      byte.b	#<Rbitmap
+    552  f402		       1f		      byte.b	#<Ubitmap
+    553  f403		       16		      byte.b	#<Dbitmap
+    554  f404
+    555  f404				   BitmapTable
+    556  f404				   Lbitmap
+    557  f404		       00		      byte.b	#%00000000
+    558  f405		       10		      byte.b	#%00010000
+    559  f406		       30		      byte.b	#%00110000
+    560  f407		       7f		      byte.b	#%01111111
+    561  f408		       ff		      byte.b	#%11111111
+    562  f409		       7f		      byte.b	#%01111111
+    563  f40a		       30		      byte.b	#%00110000
+    564  f40b		       10		      byte.b	#%00010000
+    565  f40c		       00		      byte.b	#%00000000
+    566  f40d
+    567  f40d				   Rbitmap
+    568  f40d		       00		      byte.b	#%00000000
+    569  f40e		       08		      byte.b	#%00001000
+    570  f40f		       0c		      byte.b	#%00001100
+    571  f410		       fe		      byte.b	#%11111110
+    572  f411		       ff		      byte.b	#%11111111
+    573  f412		       fe		      byte.b	#%11111110
+    574  f413		       0c		      byte.b	#%00001100
+    575  f414		       08		      byte.b	#%00001000
+    576  f415		       00		      byte.b	#%00000000
+    577  f416
+    578  f416				   Dbitmap
+    579  f416		       00		      byte.b	#%00000000
+    580  f417		       10		      byte.b	#%00010000
+    581  f418		       38		      byte.b	#%00111000
+    582  f419		       7c		      byte.b	#%01111100
+    583  f41a		       fe		      byte.b	#%11111110
+    584  f41b		       38		      byte.b	#%00111000
+    585  f41c		       38		      byte.b	#%00111000
+    586  f41d		       38		      byte.b	#%00111000
+    587  f41e		       00		      byte.b	#%00000000
+    588  f41f
+    589  f41f				   Ubitmap
+    590  f41f		       00		      byte.b	#%00000000
+    591  f420		       38		      byte.b	#%00111000
+    592  f421		       38		      byte.b	#%00111000
+    593  f422		       38		      byte.b	#%00111000
+    594  f423		       fe		      byte.b	#%11111110
+    595  f424		       7c		      byte.b	#%01111100
+    596  f425		       38		      byte.b	#%00111000
+    597  f426		       10		      byte.b	#%00010000
+    598  f427		       00		      byte.b	#%00000000
+    599  f428
+    600  f428				   Xbitmap
+    601  f428		       00		      byte.b	#%00000000
+    602  f429		       82		      byte.b	#%10000010
+    603  f42a		       44		      byte.b	#%01000100
+    604  f42b		       28		      byte.b	#%00101000
+    605  f42c		       10		      byte.b	#%00010000
+    606  f42d		       28		      byte.b	#%00101000
+    607  f42e		       44		      byte.b	#%01000100
+    608  f42f		       82		      byte.b	#%10000010
+    609  f430		       00		      byte.b	#%00000000
+    610  f431
+    611  f431				   NullBitmap
+    612  f431		       00		      byte.b	#%00000000
+    613  f432		       00		      byte.b	#%00000000
+    614  f433		       00		      byte.b	#%00000000
+    615  f434		       00		      byte.b	#%00000000
+    616  f435		       00		      byte.b	#%00000000
+    617  f436		       00		      byte.b	#%00000000
+    618  f437		       00		      byte.b	#%00000000
+    619  f438		       00		      byte.b	#%00000000
+    620  f439		       00		      byte.b	#%00000000
+    621  f43a
+    622  f43a				   TimeBitmap
+    623  f43a		       00		      byte.b	#%00000000
+    624  f43b		       ff		      byte.b	#%11111111
+    625  f43c		       5a		      byte.b	#%01011010
+    626  f43d		       24		      byte.b	#%00100100
+    627  f43e		       18		      byte.b	#%00011000
+    628  f43f		       24		      byte.b	#%00100100
+    629  f440		       42		      byte.b	#%01000010
+    630  f441		       ff		      byte.b	#%11111111
+    631  f442		       00		      byte.b	#%00000000
+    632  f443
+    633  f443				   P0color
+    634  f443		       00		      byte.b	#$00
+    635  f444		       00		      byte.b	#$00
+    636  f445		       00		      byte.b	#$00
+    637  f446		       00		      byte.b	#$00
+    638  f447		       00		      byte.b	#$00
+    639  f448		       00		      byte.b	#$00
+    640  f449		       00		      byte.b	#$00
+    641  f44a		       00		      byte.b	#$00
+    642  f44b		       00		      byte.b	#$00
+    643  f44c
+    644  f44c							;;; X and Y location per directional icon
+    645  f44c				   PositionX
+    646  f44c		       35		      byte.b	#53	; left
+    647  f44d		       6b		      byte.b	#107	; right
+    648  f44e		       50		      byte.b	#80	; up
+    649  f44f		       50		      byte.b	#80	; down
+    650  f450
+    651  f450				   PositionY
+    652  f450		       5d		      byte.b	#93	; left (177/2 - 9/2)
+    653  f451		       5d		      byte.b	#93	; right
+    654  f452		       80		      byte.b	#128	; up
+    655  f453		       3b		      byte.b	#59	; down
+    656  f454
+    657  f454							;;; digits.h should set digitTable at the beginning followed by
+    658  f454							;;;	      an array of 16 bytes for each digit 0-9
 ------- FILE digitTableRight.h LEVEL 2 PASS 2
       0  f454					      include	"digitTableRight.h"
       1  f500		       00 00 00 00*	      align	256
@@ -1961,11 +1939,33 @@
     222  f8ce		       00		      .byte.b	%00000000	;|
     223  f8cf		       00		      .byte.b	%00000000	;|
 ------- FILE cart.asm
-    685  f8d0
-    686  f8d0							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    687  f8d0							;;;;  end ROM lookup tables
-    688  f8d0
-    689  f8d0							;;; Complete to 4kB
+    663  f8d0
+    664  f900		       00 00 00 00*	      align	256	; set on page boundary per timing reasons
+    665  f900							;;; fine adjustment for PosObject
+    666  f900							;;; some explanation on "negative index" is here:
+    667  f900							;;; - https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-24.html
+    668  f900				   fineAdjustBegin
+    669  f900		       70		      DC.B	%01110000	; Left 7
+    670  f901		       60		      DC.B	%01100000	; Left 6
+    671  f902		       50		      DC.B	%01010000	; Left 5
+    672  f903		       40		      DC.B	%01000000	; Left 4
+    673  f904		       30		      DC.B	%00110000	; Left 3
+    674  f905		       20		      DC.B	%00100000	; Left 2
+    675  f906		       10		      DC.B	%00010000	; Left 1
+    676  f907		       00		      DC.B	%00000000	; No movement.
+    677  f908		       f0		      DC.B	%11110000	; Right 1
+    678  f909		       e0		      DC.B	%11100000	; Right 2
+    679  f90a		       d0		      DC.B	%11010000	; Right 3
+    680  f90b		       c0		      DC.B	%11000000	; Right 4
+    681  f90c		       b0		      DC.B	%10110000	; Right 5
+    682  f90d		       a0		      DC.B	%10100000	; Right 6
+    683  f90e		       90		      DC.B	%10010000	; Right 7
+    684  f90e		       f8 0f	   fineAdjustTable EQU	fineAdjustBegin - %11110001	; NOTE: %11110001 = -15
+    685  f90f
+    686  f90f							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    687  f90f							;;;;  end ROM lookup tables
+    688  f90f
+    689  f90f							;;; Complete to 4kB
     690  fffc					      org	$FFFC
     691  fffc		       00 f0		      .word.w	Start
     692  fffe		       00 f0		      .word.w	Start

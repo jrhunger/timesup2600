@@ -13,7 +13,10 @@
 3.store                  f1a4              (R )
 4.fixed                  f1b1                  
 4.random                 f1bc              (R )
+5.timesup                f1e8              (R )
+5.usetime                f1d6              (R )
 7.divideby15             f303              (R )
+8.noeor                  f319              (R )
 AUDC0                    0015                  
 AUDC1                    0016                  
 AUDF0                    0017                  
@@ -54,8 +57,8 @@ ENAM0                    001d
 ENAM1                    001e                  
 EndP0Input               f0e9              (R )
 EndP0InputCheck          f0bc              (R )
-fineAdjustBegin          f312              (R )
-fineAdjustTable          f221                  
+fineAdjustBegin          f900              (R )
+fineAdjustTable          f80f                  
 GameState                008a              (R )
 GRP0                     001b              (R )
 GRP1                     001c                  
@@ -85,7 +88,6 @@ LeftScorePtr4            00a8              (R )
 LeftScorePtr5            00aa              (R )
 LoadScorePointers        f201              (R )
 NewBitmap                f080                  
-noeor                    f328              (R )
 NoNewBitmap              f093              (R )
 NotActive                f075              (R )
 NullBitmap               f431              (R )
@@ -110,7 +112,7 @@ PositionX                f44c              (R )
 PositionY                f450              (R )
 PosObject                f300              (R )
 Rand8                    008c              (R )
-Random                   f321              (R )
+Random                   f312              (R )
 Rbitmap                  f40d              (R )
 REFP0                    000b                  
 REFP1                    000c                  
@@ -152,10 +154,8 @@ TIM1T                    0294
 TIM64T                   0296              (R )
 TIM8T                    0295                  
 TimeBitmap               f43a              (R )
-TimesUp                  f1e8              (R )
 TIMINT                   0285                  
 Ubitmap                  f41f              (R )
-UseTime                  f1d6              (R )
 VBLANK                   0001              (R )
 VDELBL                   0027                  
 VDELP0                   0025                  

@@ -24,8 +24,22 @@ Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.b
   * neutral sound when icon pops
 * Game controls:
   * difficulty - disable random position?
-* Modes/switches:
+
+### game settings working notes
+* Position Modes: P1/P2
+  * 0: 1H,2H fixed correlated
+  * 1: 1H fixed correlated, 2H fixed uncorrelated
+  * 2: 1H fixed correlated, 2H random
+  * 3: 1H,2H random
+* available variables:
   * position
     * fixed/correlated
     * fixed/uncorrelated
     * random
+  * delay modes
+    * fixed (bw)
+    * random (color)
+* Switches: (8 combinations)
+  * difficulty P1
+  * difficulty P2
+  * Color/BW
