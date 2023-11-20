@@ -6,17 +6,25 @@
 ;;;; start constant declarations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 P0HEIGHT equ 9
-; contants for use with game state
+;; contants for use with game state
 ST_TIMECOUNT equ %00000001  ; counting time?
 ST_GAMEINPUT equ %00000010  ; checking player input?
 ST_CHECKRST  equ %00000100  ; checking reset switch?
 ST_CHECKSLCT equ %00001000  ; checking select switch?
-; contants for reading console switches
+;; contants for reading console switches
 SW_RESET     equ %00000001  ; reset switch
 SW_SELECT    equ %00000010  ; select switch
 SW_COLOR     equ %00001000  ; b/w (0) / color (1)
 SW_P0DIFF    equ %01000000  ; P0 difficulty | 0 = Beginner
 SW_P1DIFF    equ %10000000  ; P1 difficulty | 1 = Advanced
+;; constants for use with game mode
+; position modes:
+; 00 = center
+; 01 = fixed correlated to arrow
+; 10 = random
+; 11 = fixed random (in central positions uncorrelated to arrow)
+MP_FIXED     equ %00000001  ; fixed central positions
+MP_RANDOM    equ %00000010  ; fixed central positions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; end constant declarations
 
@@ -35,11 +43,13 @@ P0score      byte ; (86) P0 score
 P0bitmap     byte ; (87) P0bitmap (without screen-draw offset)
 LeftScore4   byte ; (88) Score Digits
 LeftScore5   byte ; (89) Score Digits
-; GameState - bitwise game state, see ST_* contsants
+; GameState - bitwise game state, see ST_* constants
 GameState    byte ; (8a) 
-DelayTime    byte ; (8a) Time left in delay
-Rand8        byte ; (8b) 8-bit random
-InputTime    byte ; (8c) Input re-check delay
+; GameMode - bitwise game mode, see M?_* constants
+GameMode     byte ; (8b) 
+DelayTime    byte ; (8c) Time left in delay
+Rand8        byte ; (8d) 8-bit random
+InputTime    byte ; (8e) Input re-check delay
 
 ; Top Bar digit pointers
     org $a0
@@ -72,10 +82,8 @@ Start:
 	lda #<Ubitmap
 	sta P0bitmap
 ;;; player coordinates (match bitmap above)
-	lda PositionX+2
-	sta P0x
-	lda PositionY+2
-	sta P0y
+	lda #0
+	jsr SetPosition
 ;;; Set high byte of P0spritePtr (low byte updated per frame)
 	lda #>BitmapTable
 	sta P0spriteHi
@@ -107,6 +115,10 @@ Start:
     lda #>digitTableRightRev
     sta LeftScorePtr3+1
     sta RightScorePtr0+1
+
+;;; game mode
+    lda #0
+	sta GameMode
 
 ;;; register setup
     ; playfield color
@@ -389,15 +401,33 @@ SelectCheck SUBROUTINE
 .end:
     rts
 
+;; SetPosition expects the arrow bitmap index (0-3) in Y
 SetPosition SUBROUTINE	
 	; Update position
-	lda #5         ; starting at 999 so half is roughly 500
-	cmp P0time1
-	bcs .random ; if 5 > P0time1
+;	lda #5         ; starting at 999 so half is roughly 500
+;	cmp P0time1
+;   bcs .random ; if 5 > P0time1
+    lda MP_FIXED | MP_RANDOM
+	and GameMode
+	beq .center 
+	cmp MP_FIXED | MP_RANDOM
+	beq .fixedrandom
+	lda MP_RANDOM
+	bit GameMode
+	bne .random
 .fixed:
     lda PositionX,Y
 	sta P0x
     lda PositionY,Y
+	sta P0y
+	rts
+.fixedrandom:
+    jsr Random
+	and #%00000011
+	tax
+	lda PositionX,X
+	sta P0x
+	lda PositionY,X
 	sta P0y
 	rts
 .random:
@@ -410,6 +440,12 @@ SetPosition SUBROUTINE
 	ora #%00010000 ; lower bound 16
 	sta P0y
 	rts
+.center
+	lda PositionX+2
+	sta P0x
+	lda PositionY
+	sta P0y
+    rts
 
 ConsumeTime SUBROUTINE
     lda ST_TIMECOUNT  ; check if TIMECOUNT bit
