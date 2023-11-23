@@ -11,6 +11,11 @@ Simple reaction game of finite length.
 * Time unit is screen cycles (60/second)
   * Before the game starts, use the select button to add time (max 2500)
   * Delay between arrows is random between 16 and 127 cycles
+* Position mode can be selected by P0 and P1 difficulty switches
+  * P0 Beginner, P1 Beginner: always in center
+  * P0 Advanced, P1 Beginner: offset from center in direction of arrow
+  * P0 Beginner, P1 Advanced: random anywhere on board
+  * P1 Advanced, P1 Advanced: random in one of the 4 offset positions
 
 # Try it:
 Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.binaryj.net/roms/timesup.bin)

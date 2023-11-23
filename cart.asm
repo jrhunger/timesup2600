@@ -50,6 +50,7 @@ GameMode     byte ; (8b)
 DelayTime    byte ; (8c) Time left in delay
 Rand8        byte ; (8d) 8-bit random
 InputTime    byte ; (8e) Input re-check delay
+ReposTime    byte ; (8f) Input re-check delay
 
 ; Top Bar digit pointers
     org $a0
@@ -83,6 +84,7 @@ Start:
 	sta P0bitmap
 ;;; player coordinates (match bitmap above)
 	lda #0
+	tay
 	jsr SetPosition
 ;;; Set high byte of P0spritePtr (low byte updated per frame)
 	lda #>BitmapTable
@@ -93,9 +95,9 @@ Start:
 	lda #$10
 	sta P0time1
 
-;;; check input but don't consume time
-    lda ST_GAMEINPUT | ST_CHECKSLCT
-	sta GameState
+;;; set ReposTime (for moving arrow)
+    lda #16
+	sta ReposTime
 
 ;;; Set Score Digits
     lda #$0a     ; blank
@@ -116,8 +118,12 @@ Start:
     sta LeftScorePtr3+1
     sta RightScorePtr0+1
 
+;;; game state -  check input but don't consume time
+    lda ST_GAMEINPUT | ST_CHECKSLCT
+	sta GameState
+
 ;;; game mode
-    lda #0
+    lda #0       ; all mode bits clear
 	sta GameMode
 
 ;;; register setup
@@ -144,7 +150,6 @@ StartFrame:
 ;;;; set timer for VBLANK
 	LDA #44
 	STA	TIM64T
-
 	lda #0
 	sta VSYNC	; turn off VSYNC
 
@@ -209,7 +214,7 @@ EndP0InputCheck:
 ;;; do input-related processing
 CheckInputCorrect:
     cpx #<NullBitmap   ; if x hasn't changed
-	beq EndP0Input	   ; we didn't get input
+	beq NoInput	       ; we didn't get input
 	lda #0             ; if we did get input
 	sta GameState      ; stop time counter and input checking
 	cpx P0bitmap       ; check if input matches icon
@@ -237,11 +242,26 @@ SetDelay:
 	and #%00111111     ; max 127 (just over 2 second)
 	ora #%00001000     ; min 16 (around 1/4 second)
 	sta DelayTime
+	jmp EndP0Input
+NoInput:
+    lda ST_TIMECOUNT
+	bit GameState
+	bne EndP0Input
+	dec ReposTime
+	beq ChangePosition
+	jmp EndP0Input
+ChangePosition
+    lda #16
+	sta ReposTime
+	lda #2
+	tay
+    jsr SetPosition
 EndP0Input:
 ; check for game switches 
 ; (subroutines know if input being accepted based on current state)
     jsr ResetCheck
     jsr SelectCheck
+	jsr ModeCheck
 ;;; end of input processing	
 
 
@@ -401,15 +421,41 @@ SelectCheck SUBROUTINE
 .end:
     rts
 
+;; Check switches to set GameMode
+ModeCheck SUBROUTINE
+    lda #SW_P0DIFF
+	bit SWCHB
+	beq .p0beginner
+.p0advanced
+	lda GameMode
+	ora #MP_FIXED
+	sta GameMode
+	jmp .checkp1diff
+.p0beginner	
+    lda #MP_FIXED ^ #$FF  ; invert mask
+	and GameMode
+	sta GameMode
+.checkp1diff
+    lda #SW_P1DIFF
+	bit SWCHB
+	beq .p1beginner
+.p1advanced
+	lda GameMode
+	ora #MP_RANDOM
+	sta GameMode
+	rts
+.p1beginner
+    lda #MP_RANDOM ^ #$FF  ; invert mask
+	and GameMode
+	sta GameMode
+	rts
+
 ;; SetPosition expects the arrow bitmap index (0-3) in Y
 SetPosition SUBROUTINE	
 	; Update position
-;	lda #5         ; starting at 999 so half is roughly 500
-;	cmp P0time1
-;   bcs .random ; if 5 > P0time1
     lda MP_FIXED | MP_RANDOM
 	and GameMode
-	beq .center 
+	beq .center
 	cmp MP_FIXED | MP_RANDOM
 	beq .fixedrandom
 	lda MP_RANDOM
@@ -581,101 +627,7 @@ Random SUBROUTINE
 
 ;;;;  start ROM lookup tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    align 256
-BitmapIndex:
-    byte #<Lbitmap
-    byte #<Rbitmap
-    byte #<Ubitmap
-    byte #<Dbitmap
-
-BitmapTable:
-Lbitmap:
-	byte #%00000000
-	byte #%00010000
-	byte #%00110000
-	byte #%01111111
-	byte #%11111111
-	byte #%01111111
-	byte #%00110000
-	byte #%00010000
-	byte #%00000000
-
-Rbitmap:
-	byte #%00000000
-	byte #%00001000
-	byte #%00001100
-	byte #%11111110
-	byte #%11111111
-	byte #%11111110
-	byte #%00001100
-	byte #%00001000
-	byte #%00000000
-
-Dbitmap:
-	byte #%00000000
-	byte #%00010000
-	byte #%00111000
-	byte #%01111100
-	byte #%11111110
-	byte #%00111000
-	byte #%00111000
-	byte #%00111000
-	byte #%00000000
-
-Ubitmap:
-	byte #%00000000
-	byte #%00111000
-	byte #%00111000
-	byte #%00111000
-	byte #%11111110
-	byte #%01111100
-	byte #%00111000
-	byte #%00010000
-	byte #%00000000
-
-Xbitmap:
-	byte #%00000000
-	byte #%10000010
-	byte #%01000100
-	byte #%00101000
-	byte #%00010000
-	byte #%00101000
-	byte #%01000100
-	byte #%10000010
-	byte #%00000000
-
-NullBitmap:
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-	byte #%00000000
-
-TimeBitmap:
-	byte #%00000000
-	byte #%11111111
-	byte #%01011010
-	byte #%00100100
-	byte #%00011000
-	byte #%00100100
-	byte #%01000010
-	byte #%11111111
-	byte #%00000000
-
-P0color:
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
-	byte #$00
+    include "bitmaps.h"
 
 ;;; X and Y location per directional icon
 PositionX:

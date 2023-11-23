@@ -1,24 +1,29 @@
 --- Symbol List (sorted by symbol)
-0.DrawP0                 f14d              (R )
+0.DrawP0                 f16f              (R )
 0.FREE_BYTES             0000                  
-0.LoopVisible            f13c              (R )
-0.NoDrawP0               f150              (R )
-0.OverscanWaitLoop       f163              (R )
-0.ScrollLoop             f113              (R )
-0.VblankWaitLoop         f108              (R )
+0.LoopVisible            f15e              (R )
+0.NoDrawP0               f172              (R )
+0.OverscanWaitLoop       f185              (R )
+0.ScrollLoop             f135              (R )
+0.VblankWaitLoop         f12a              (R )
 1.CLEAR_STACK            f006              (R )
-2.end                    f17f              (R )
-3.checkselect            f18f              (R )
-3.end                    f1a9              (R )
-3.store                  f1a3              (R )
-4.center                 f1e9              (R )
-4.fixed                  f1ba                  
-4.fixedrandom            f1c5              (R )
-4.random                 f1d6              (R )
-5.timesup                f20d              (R )
-5.usetime                f1fb              (R )
-7.divideby15             f303              (R )
-8.noeor                  f319              (R )
+2.end                    f1a1              (R )
+3.checkselect            f1b1              (R )
+3.end                    f1cb              (R )
+3.store                  f1c5              (R )
+4.checkp1diff            f1e2              (R )
+4.p0advanced             f1d3                  
+4.p0beginner             f1dc              (R )
+4.p1advanced             f1e9                  
+4.p1beginner             f1f0              (R )
+5.center                 f236              (R )
+5.fixed                  f207                  
+5.fixedrandom            f212              (R )
+5.random                 f223              (R )
+6.timesup                f25a              (R )
+6.usetime                f248              (R )
+8.divideby15             f303              (R )
+9.noeor                  f319              (R )
 AUDC0                    0015                  
 AUDC1                    0016                  
 AUDF0                    0017                  
@@ -27,17 +32,18 @@ AUDV0                    0019
 AUDV1                    001a                  
 BitmapIndex              f400              (R )
 BitmapTable              f404              (R )
-CheckInput               f095              (R )
-CheckInputCorrect        f0bb                  
-CheckP0Down              f0a0              (R )
-CheckP0Left              f0b2              (R )
-CheckP0Right             f0a9              (R )
-CheckP0Up                f097                  
+ChangePosition           f0fd              (R )
+CheckInput               f09a              (R )
+CheckInputCorrect        f0c0                  
+CheckP0Down              f0a5              (R )
+CheckP0Left              f0b7              (R )
+CheckP0Right             f0ae              (R )
+CheckP0Up                f09c                  
 COLUBK                   0009              (R )
 COLUP0                   0006                  
 COLUP1                   0007                  
 COLUPF                   0008              (R )
-ConsumeTime              f1f4              (R )
+ConsumeTime              f241              (R )
 CTRLPF                   000a                  
 CXBLPF                   0006                  
 CXCLR                    002c                  
@@ -57,8 +63,8 @@ digitTableRightRev       f700              (R )
 ENABL                    001f                  
 ENAM0                    001d                  
 ENAM1                    001e                  
-EndP0Input               f0e8              (R )
-EndP0InputCheck          f0bb              (R )
+EndP0Input               f107              (R )
+EndP0InputCheck          f0c0              (R )
 fineAdjustBegin          f900              (R )
 fineAdjustTable          f80f                  
 GameMode                 008b              (R )
@@ -89,20 +95,22 @@ LeftScorePtr2            00a4              (R )
 LeftScorePtr3            00a6              (R )
 LeftScorePtr4            00a8              (R )
 LeftScorePtr5            00aa              (R )
-LoadScorePointers        f226              (R )
+LoadScorePointers        f273              (R )
+ModeCheck                f1cc              (R )
 MP_FIXED                 0001              (R )
 MP_RANDOM                0002              (R )
-NewBitmap                f07f                  
-NoNewBitmap              f092              (R )
-NotActive                f074              (R )
+NewBitmap                f084                  
+NoInput                  f0f0              (R )
+NoNewBitmap              f097              (R )
+NotActive                f079              (R )
 NullBitmap               f431              (R )
 NUSIZ0                   0004              (R )
 NUSIZ1                   0005                  
 P0bitmap                 0087              (R )
 P0color                  f443                  
-P0Correct                f0c7                  
+P0Correct                f0cc                  
 P0HEIGHT                 0009              (R )
-P0Incorrect              f0d7              (R )
+P0Incorrect              f0dc              (R )
 P0score                  0086              (R )
 P0spriteHi               0083              (R )
 P0spritePtr              0082              (R )
@@ -121,8 +129,9 @@ Random                   f312              (R )
 Rbitmap                  f40d              (R )
 REFP0                    000b                  
 REFP1                    000c                  
+ReposTime                008f              (R )
 RESBL                    0014                  
-ResetCheck               f16f              (R )
+ResetCheck               f191              (R )
 RESM0                    0012                  
 RESM1                    0013                  
 RESMP0                   0028                  
@@ -132,19 +141,19 @@ RESP1                    0011
 RightScorePtr0           00ac              (R )
 RightScorePtr1           00ae              (R )
 RSYNC                    0003                  
-SelectCheck              f180              (R )
-SetActive                f08e                  
-SetDelay                 f0df              (R )
-SetPosition              f1aa              (R )
+SelectCheck              f1a2              (R )
+SetActive                f093                  
+SetDelay                 f0e4              (R )
+SetPosition              f1f7              (R )
 ST_CHECKRST              0004              (R )
 ST_CHECKSLCT             0008              (R )
 ST_GAMEINPUT             0002              (R )
 ST_TIMECOUNT             0001              (R )
 Start                    f000              (R )
-StartFrame               f055              (R )
+StartFrame               f05a              (R )
 SW_COLOR                 0008                  
-SW_P0DIFF                0040                  
-SW_P1DIFF                0080                  
+SW_P0DIFF                0040              (R )
+SW_P1DIFF                0080              (R )
 SW_RESET                 0001              (R )
 SW_SELECT                0002              (R )
 SWACNT                   0281                  
