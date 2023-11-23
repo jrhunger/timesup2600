@@ -7,21 +7,22 @@
 0.ScrollLoop             f135              (R )
 0.VblankWaitLoop         f12a              (R )
 1.CLEAR_STACK            f006              (R )
-2.end                    f1a1              (R )
-3.checkselect            f1b1              (R )
-3.end                    f1cb              (R )
-3.store                  f1c5              (R )
-4.checkp1diff            f1e2              (R )
-4.p0advanced             f1d3                  
-4.p0beginner             f1dc              (R )
-4.p1advanced             f1e9                  
-4.p1beginner             f1f0              (R )
-5.center                 f236              (R )
-5.fixed                  f207                  
-5.fixedrandom            f212              (R )
-5.random                 f223              (R )
-6.timesup                f25a              (R )
-6.usetime                f248              (R )
+2.end                    f1aa              (R )
+2.reset                  f1a7              (R )
+3.checkselect            f1ba              (R )
+3.end                    f1d4              (R )
+3.store                  f1ce              (R )
+4.checkp1diff            f1eb              (R )
+4.p0advanced             f1dc                  
+4.p0beginner             f1e5              (R )
+4.p1advanced             f1f2                  
+4.p1beginner             f1f9              (R )
+5.center                 f23f              (R )
+5.fixed                  f210                  
+5.fixedrandom            f21b              (R )
+5.random                 f22c              (R )
+6.timesup                f263              (R )
+6.usetime                f251              (R )
 8.divideby15             f303              (R )
 9.noeor                  f319              (R )
 AUDC0                    0015                  
@@ -43,7 +44,7 @@ COLUBK                   0009              (R )
 COLUP0                   0006                  
 COLUP1                   0007                  
 COLUPF                   0008              (R )
-ConsumeTime              f241              (R )
+ConsumeTime              f24a              (R )
 CTRLPF                   000a                  
 CXBLPF                   0006                  
 CXCLR                    002c                  
@@ -82,7 +83,7 @@ INPT0                    0008
 INPT1                    0009                  
 INPT2                    000a                  
 INPT3                    000b                  
-INPT4                    000c                  
+INPT4                    000c              (R )
 INPT5                    000d                  
 InputTime                008e              (R )
 INTIM                    0284              (R )
@@ -95,8 +96,8 @@ LeftScorePtr2            00a4              (R )
 LeftScorePtr3            00a6              (R )
 LeftScorePtr4            00a8              (R )
 LeftScorePtr5            00aa              (R )
-LoadScorePointers        f273              (R )
-ModeCheck                f1cc              (R )
+LoadScorePointers        f27c              (R )
+ModeCheck                f1d5              (R )
 MP_FIXED                 0001              (R )
 MP_RANDOM                0002              (R )
 NewBitmap                f084                  
@@ -141,10 +142,10 @@ RESP1                    0011
 RightScorePtr0           00ac              (R )
 RightScorePtr1           00ae              (R )
 RSYNC                    0003                  
-SelectCheck              f1a2              (R )
+SelectCheck              f1ab              (R )
 SetActive                f093                  
 SetDelay                 f0e4              (R )
-SetPosition              f1f7              (R )
+SetPosition              f200              (R )
 ST_CHECKRST              0004              (R )
 ST_CHECKSLCT             0008              (R )
 ST_GAMEINPUT             0002              (R )

@@ -387,7 +387,12 @@ ResetCheck SUBROUTINE
 	beq .end
 	lda SW_RESET
 	bit SWCHB
-	bne .end
+	beq .reset
+	lda #%10000000     ; only bit 7 used
+	bit INPT4
+	beq .reset
+	jmp .end
+.reset
 	; actual RESET behavior
 	jmp Start
 .end:
