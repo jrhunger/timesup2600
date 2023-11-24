@@ -373,7 +373,7 @@
       5  0000 ????
       6  0000 ????						;;;; start constant declarations
       7  0000 ????						;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      8  0000 ????	       00 09	   P0HEIGHT   equ	9
+      8  0000 ????	       00 10	   P0HEIGHT   equ	16
       9  0000 ????						;; contants for use with game state
      10  0000 ????	       00 01	   ST_TIMECOUNT equ	%00000001	; counting time?
      11  0000 ????	       00 02	   ST_GAMEINPUT equ	%00000010	; checking player input?
@@ -459,7 +459,7 @@
      80  f00e		       05 01		      ora	$1	; can't be zero
      81  f010		       85 8d		      sta	Rand8
      82  f012							;;; Set initial P0bitmap to Up
-     83  f012		       a9 1f		      lda	#<Ubitmap
+     83  f012		       a9 34		      lda	#<Ubitmap
      84  f014		       85 87		      sta	P0bitmap
      85  f016							;;; player coordinates (match bitmap above)
      86  f016		       a9 00		      lda	#0
@@ -510,8 +510,8 @@
     131  f052		       a9 37		      lda	#55
     132  f054		       85 08		      sta	COLUPF
     133  f056							; player/missile size register
-    134  f056		       a5 00		      lda	%00000000	; one player, single-sized
-    135  f058							;lda %00000101    ; one player, double-sized
+    134  f056							;lda %00000000    ; one player, single-sized
+    135  f056		       a5 05		      lda	%00000101	; one player, double-sized
     136  f058							;lda %00000111    ; one player, quad-sized
     137  f058		       85 04		      sta	NUSIZ0
     138  f05a							;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -567,22 +567,22 @@
     188  f09a
     189  f09a							;;; check input signals
     190  f09a				   CheckInput
-    191  f09a		       a2 31		      ldx	#<NullBitmap
+    191  f09a		       a2 54		      ldx	#<NullBitmap
     192  f09c				   CheckP0Up
     193  f09c		       a9 10		      lda	#%00010000
     194  f09e		       2c 80 02 	      bit	SWCHA
     195  f0a1		       d0 02		      bne	CheckP0Down
-    196  f0a3		       a2 1f		      ldx	#<Ubitmap
+    196  f0a3		       a2 34		      ldx	#<Ubitmap
     197  f0a5				   CheckP0Down
     198  f0a5		       a9 20		      lda	#%00100000
     199  f0a7		       2c 80 02 	      bit	SWCHA
     200  f0aa		       d0 02		      bne	CheckP0Right
-    201  f0ac		       a2 16		      ldx	#<Dbitmap
+    201  f0ac		       a2 24		      ldx	#<Dbitmap
     202  f0ae				   CheckP0Right
     203  f0ae		       a9 80		      lda	#%10000000
     204  f0b0		       2c 80 02 	      bit	SWCHA
     205  f0b3		       d0 02		      bne	CheckP0Left
-    206  f0b5		       a2 0d		      ldx	#<Rbitmap
+    206  f0b5		       a2 14		      ldx	#<Rbitmap
     207  f0b7				   CheckP0Left
     208  f0b7		       a9 40		      lda	#%01000000
     209  f0b9		       2c 80 02 	      bit	SWCHA
@@ -592,7 +592,7 @@
     213  f0c0
     214  f0c0							;;; do input-related processing
     215  f0c0				   CheckInputCorrect
-    216  f0c0		       e0 31		      cpx	#<NullBitmap	; if x hasn't changed
+    216  f0c0		       e0 54		      cpx	#<NullBitmap	; if x hasn't changed
     217  f0c2		       f0 2c		      beq	NoInput	; we didn't get input
     218  f0c4		       a9 00		      lda	#0	; if we did get input
     219  f0c6		       85 8a		      sta	GameState	; stop time counter and input checking
@@ -607,11 +607,11 @@
     228  f0d2		       85 86		      sta	P0score
     229  f0d4		       d8		      cld
     230  f0d5							; set bitmap to null
-    231  f0d5		       a9 31		      lda	#<NullBitmap
+    231  f0d5		       a9 54		      lda	#<NullBitmap
     232  f0d7		       85 87		      sta	P0bitmap
     233  f0d9		       4c e4 f0 	      jmp	SetDelay
     234  f0dc				   P0Incorrect
-    235  f0dc		       a9 28		      lda	#<Xbitmap	; set bitmap to X
+    235  f0dc		       a9 44		      lda	#<Xbitmap	; set bitmap to X
     236  f0de		       85 87		      sta	P0bitmap
     237  f0e0		       a5 01		      lda	ST_TIMECOUNT	; time active, input not
     238  f0e2		       85 8a		      sta	GameState
@@ -651,7 +651,7 @@
     272  f117							;;; P0 vertical position
     273  f117		       a5 87		      lda	P0bitmap	; bitmap base
     274  f119		       18		      clc		; clear carry for add
-    275  f11a		       69 09		      adc	#P0HEIGHT	; bitmap high end
+    275  f11a		       69 10		      adc	#P0HEIGHT	; bitmap high end
     276  f11c		       38		      sec		; set carry for subtract
     277  f11d		       e5 81		      sbc	P0y	; offset by P0y for draw logic
     278  f11f		       85 82		      sta	P0spritePtr	; store in sprite pointer
@@ -712,7 +712,7 @@
     333  f162		       38		      sec		; 2 set carry
     334  f163		       98		      tya		; 2
     335  f164		       e5 81		      sbc	P0y	; 3
-    336  f166		       65 09		      adc	P0HEIGHT	; 2
+    336  f166		       65 10		      adc	P0HEIGHT	; 2
     337  f168		       b0 05		      bcs	.DrawP0
     338  f16a
     339  f16a		       ea		      nop		; 2
@@ -846,18 +846,18 @@
     467  f20c		       24 8b		      bit	GameMode
     468  f20e		       d0 1c		      bne	.random
     469  f210				   .fixed
-    470  f210		       b9 4c f4 	      lda	PositionX,Y
+    470  f210		       b9 7d f4 	      lda	PositionX,Y
     471  f213		       85 80		      sta	P0x
-    472  f215		       b9 50 f4 	      lda	PositionY,Y
+    472  f215		       b9 81 f4 	      lda	PositionY,Y
     473  f218		       85 81		      sta	P0y
     474  f21a		       60		      rts
     475  f21b				   .fixedrandom
     476  f21b		       20 12 f3 	      jsr	Random
     477  f21e		       29 03		      and	#%00000011
     478  f220		       aa		      tax
-    479  f221		       bd 4c f4 	      lda	PositionX,X
+    479  f221		       bd 7d f4 	      lda	PositionX,X
     480  f224		       85 80		      sta	P0x
-    481  f226		       bd 50 f4 	      lda	PositionY,X
+    481  f226		       bd 81 f4 	      lda	PositionY,X
     482  f229		       85 81		      sta	P0y
     483  f22b		       60		      rts
     484  f22c				   .random
@@ -871,9 +871,9 @@
     492  f23c		       85 81		      sta	P0y
     493  f23e		       60		      rts
     494  f23f				   .center
-    495  f23f		       ad 4e f4 	      lda	PositionX+2
+    495  f23f		       ad 7f f4 	      lda	PositionX+2
     496  f242		       85 80		      sta	P0x
-    497  f244		       ad 50 f4 	      lda	PositionY
+    497  f244		       ad 81 f4 	      lda	PositionY
     498  f247		       85 81		      sta	P0y
     499  f249		       60		      rts
     500  f24a
@@ -901,11 +901,11 @@
     522  f267		       85 85		      sta	P0time1
     523  f269		       a5 0c		      lda	ST_CHECKRST | ST_CHECKSLCT
     524  f26b		       85 8a		      sta	GameState
-    525  f26d		       a9 3a		      lda	#<TimeBitmap
+    525  f26d		       a9 64		      lda	#<TimeBitmap
     526  f26f		       85 87		      sta	P0bitmap
-    527  f271		       ad 4e f4 	      lda	PositionX+2
+    527  f271		       ad 7f f4 	      lda	PositionX+2
     528  f274		       85 80		      sta	P0x
-    529  f276		       ad 50 f4 	      lda	PositionY
+    529  f276		       ad 81 f4 	      lda	PositionY
     530  f279		       85 81		      sta	P0y
     531  f27b		       60		      rts
     532  f27c
@@ -1016,117 +1016,166 @@
       1  f400		       00 00 00 00*	      align	256
       2  f400				   BitmapIndex
       3  f400		       04		      byte.b	#<Lbitmap
-      4  f401		       0d		      byte.b	#<Rbitmap
-      5  f402		       1f		      byte.b	#<Ubitmap
-      6  f403		       16		      byte.b	#<Dbitmap
+      4  f401		       14		      byte.b	#<Rbitmap
+      5  f402		       34		      byte.b	#<Ubitmap
+      6  f403		       24		      byte.b	#<Dbitmap
       7  f404
       8  f404				   BitmapTable
       9  f404				   Lbitmap
      10  f404		       00		      byte.b	#%00000000
      11  f405		       10		      byte.b	#%00010000
-     12  f406		       30		      byte.b	#%00110000
-     13  f407		       7f		      byte.b	#%01111111
-     14  f408		       ff		      byte.b	#%11111111
+     12  f406		       10		      byte.b	#%00010000
+     13  f407		       30		      byte.b	#%00110000
+     14  f408		       30		      byte.b	#%00110000
      15  f409		       7f		      byte.b	#%01111111
-     16  f40a		       30		      byte.b	#%00110000
-     17  f40b		       10		      byte.b	#%00010000
-     18  f40c		       00		      byte.b	#%00000000
-     19  f40d
-     20  f40d				   Rbitmap
-     21  f40d		       00		      byte.b	#%00000000
-     22  f40e		       08		      byte.b	#%00001000
-     23  f40f		       0c		      byte.b	#%00001100
-     24  f410		       fe		      byte.b	#%11111110
-     25  f411		       ff		      byte.b	#%11111111
-     26  f412		       fe		      byte.b	#%11111110
-     27  f413		       0c		      byte.b	#%00001100
-     28  f414		       08		      byte.b	#%00001000
-     29  f415		       00		      byte.b	#%00000000
-     30  f416
-     31  f416				   Dbitmap
-     32  f416		       00		      byte.b	#%00000000
-     33  f417		       10		      byte.b	#%00010000
-     34  f418		       38		      byte.b	#%00111000
-     35  f419		       7c		      byte.b	#%01111100
-     36  f41a		       fe		      byte.b	#%11111110
-     37  f41b		       38		      byte.b	#%00111000
-     38  f41c		       38		      byte.b	#%00111000
-     39  f41d		       38		      byte.b	#%00111000
-     40  f41e		       00		      byte.b	#%00000000
-     41  f41f
-     42  f41f				   Ubitmap
-     43  f41f		       00		      byte.b	#%00000000
-     44  f420		       38		      byte.b	#%00111000
-     45  f421		       38		      byte.b	#%00111000
-     46  f422		       38		      byte.b	#%00111000
-     47  f423		       fe		      byte.b	#%11111110
-     48  f424		       7c		      byte.b	#%01111100
-     49  f425		       38		      byte.b	#%00111000
-     50  f426		       10		      byte.b	#%00010000
-     51  f427		       00		      byte.b	#%00000000
-     52  f428
-     53  f428				   Xbitmap
-     54  f428		       00		      byte.b	#%00000000
-     55  f429		       82		      byte.b	#%10000010
-     56  f42a		       44		      byte.b	#%01000100
-     57  f42b		       28		      byte.b	#%00101000
-     58  f42c		       10		      byte.b	#%00010000
-     59  f42d		       28		      byte.b	#%00101000
-     60  f42e		       44		      byte.b	#%01000100
-     61  f42f		       82		      byte.b	#%10000010
-     62  f430		       00		      byte.b	#%00000000
-     63  f431
-     64  f431				   NullBitmap
-     65  f431		       00		      byte.b	#%00000000
-     66  f432		       00		      byte.b	#%00000000
-     67  f433		       00		      byte.b	#%00000000
-     68  f434		       00		      byte.b	#%00000000
-     69  f435		       00		      byte.b	#%00000000
-     70  f436		       00		      byte.b	#%00000000
-     71  f437		       00		      byte.b	#%00000000
-     72  f438		       00		      byte.b	#%00000000
-     73  f439		       00		      byte.b	#%00000000
-     74  f43a
-     75  f43a				   TimeBitmap
-     76  f43a		       00		      byte.b	#%00000000
-     77  f43b		       ff		      byte.b	#%11111111
-     78  f43c		       5a		      byte.b	#%01011010
-     79  f43d		       24		      byte.b	#%00100100
-     80  f43e		       18		      byte.b	#%00011000
-     81  f43f		       24		      byte.b	#%00100100
-     82  f440		       42		      byte.b	#%01000010
-     83  f441		       ff		      byte.b	#%11111111
-     84  f442		       00		      byte.b	#%00000000
-     85  f443
-     86  f443				   P0color
-     87  f443		       00		      byte.b	#$00
-     88  f444		       00		      byte.b	#$00
-     89  f445		       00		      byte.b	#$00
-     90  f446		       00		      byte.b	#$00
-     91  f447		       00		      byte.b	#$00
-     92  f448		       00		      byte.b	#$00
-     93  f449		       00		      byte.b	#$00
-     94  f44a		       00		      byte.b	#$00
-     95  f44b		       00		      byte.b	#$00
+     16  f40a		       7f		      byte.b	#%01111111
+     17  f40b		       ff		      byte.b	#%11111111
+     18  f40c		       ff		      byte.b	#%11111111
+     19  f40d		       7f		      byte.b	#%01111111
+     20  f40e		       7f		      byte.b	#%01111111
+     21  f40f		       30		      byte.b	#%00110000
+     22  f410		       30		      byte.b	#%00110000
+     23  f411		       10		      byte.b	#%00010000
+     24  f412		       10		      byte.b	#%00010000
+     25  f413		       00		      byte.b	#%00000000
+     26  f414
+     27  f414				   Rbitmap
+     28  f414		       00		      byte.b	#%00000000
+     29  f415		       08		      byte.b	#%00001000
+     30  f416		       08		      byte.b	#%00001000
+     31  f417		       0c		      byte.b	#%00001100
+     32  f418		       0c		      byte.b	#%00001100
+     33  f419		       fe		      byte.b	#%11111110
+     34  f41a		       fe		      byte.b	#%11111110
+     35  f41b		       ff		      byte.b	#%11111111
+     36  f41c		       ff		      byte.b	#%11111111
+     37  f41d		       fe		      byte.b	#%11111110
+     38  f41e		       fe		      byte.b	#%11111110
+     39  f41f		       0c		      byte.b	#%00001100
+     40  f420		       0c		      byte.b	#%00001100
+     41  f421		       08		      byte.b	#%00001000
+     42  f422		       08		      byte.b	#%00001000
+     43  f423		       00		      byte.b	#%00000000
+     44  f424
+     45  f424				   Dbitmap
+     46  f424		       00		      byte.b	#%00000000
+     47  f425		       10		      byte.b	#%00010000
+     48  f426		       10		      byte.b	#%00010000
+     49  f427		       38		      byte.b	#%00111000
+     50  f428		       38		      byte.b	#%00111000
+     51  f429		       7c		      byte.b	#%01111100
+     52  f42a		       7c		      byte.b	#%01111100
+     53  f42b		       fe		      byte.b	#%11111110
+     54  f42c		       fe		      byte.b	#%11111110
+     55  f42d		       38		      byte.b	#%00111000
+     56  f42e		       38		      byte.b	#%00111000
+     57  f42f		       38		      byte.b	#%00111000
+     58  f430		       38		      byte.b	#%00111000
+     59  f431		       38		      byte.b	#%00111000
+     60  f432		       38		      byte.b	#%00111000
+     61  f433		       00		      byte.b	#%00000000
+     62  f434
+     63  f434				   Ubitmap
+     64  f434		       00		      byte.b	#%00000000
+     65  f435		       38		      byte.b	#%00111000
+     66  f436		       38		      byte.b	#%00111000
+     67  f437		       38		      byte.b	#%00111000
+     68  f438		       38		      byte.b	#%00111000
+     69  f439		       38		      byte.b	#%00111000
+     70  f43a		       38		      byte.b	#%00111000
+     71  f43b		       fe		      byte.b	#%11111110
+     72  f43c		       fe		      byte.b	#%11111110
+     73  f43d		       7c		      byte.b	#%01111100
+     74  f43e		       7c		      byte.b	#%01111100
+     75  f43f		       38		      byte.b	#%00111000
+     76  f440		       38		      byte.b	#%00111000
+     77  f441		       10		      byte.b	#%00010000
+     78  f442		       10		      byte.b	#%00010000
+     79  f443		       00		      byte.b	#%00000000
+     80  f444
+     81  f444				   Xbitmap
+     82  f444		       00		      byte.b	#%00000000
+     83  f445		       82		      byte.b	#%10000010
+     84  f446		       82		      byte.b	#%10000010
+     85  f447		       44		      byte.b	#%01000100
+     86  f448		       44		      byte.b	#%01000100
+     87  f449		       28		      byte.b	#%00101000
+     88  f44a		       28		      byte.b	#%00101000
+     89  f44b		       10		      byte.b	#%00010000
+     90  f44c		       10		      byte.b	#%00010000
+     91  f44d		       28		      byte.b	#%00101000
+     92  f44e		       28		      byte.b	#%00101000
+     93  f44f		       44		      byte.b	#%01000100
+     94  f450		       44		      byte.b	#%01000100
+     95  f451		       82		      byte.b	#%10000010
+     96  f452		       82		      byte.b	#%10000010
+     97  f453		       00		      byte.b	#%00000000
+     98  f454
+     99  f454				   NullBitmap
+    100  f454		       00		      byte.b	#%00000000
+    101  f455		       00		      byte.b	#%00000000
+    102  f456		       00		      byte.b	#%00000000
+    103  f457		       00		      byte.b	#%00000000
+    104  f458		       00		      byte.b	#%00000000
+    105  f459		       00		      byte.b	#%00000000
+    106  f45a		       00		      byte.b	#%00000000
+    107  f45b		       00		      byte.b	#%00000000
+    108  f45c		       00		      byte.b	#%00000000
+    109  f45d		       00		      byte.b	#%00000000
+    110  f45e		       00		      byte.b	#%00000000
+    111  f45f		       00		      byte.b	#%00000000
+    112  f460		       00		      byte.b	#%00000000
+    113  f461		       00		      byte.b	#%00000000
+    114  f462		       00		      byte.b	#%00000000
+    115  f463		       00		      byte.b	#%00000000
+    116  f464
+    117  f464				   TimeBitmap
+    118  f464		       00		      byte.b	#%00000000
+    119  f465		       ff		      byte.b	#%11111111
+    120  f466		       ff		      byte.b	#%11111111
+    121  f467		       5a		      byte.b	#%01011010
+    122  f468		       5a		      byte.b	#%01011010
+    123  f469		       24		      byte.b	#%00100100
+    124  f46a		       24		      byte.b	#%00100100
+    125  f46b		       18		      byte.b	#%00011000
+    126  f46c		       18		      byte.b	#%00011000
+    127  f46d		       24		      byte.b	#%00100100
+    128  f46e		       24		      byte.b	#%00100100
+    129  f46f		       42		      byte.b	#%01000010
+    130  f470		       42		      byte.b	#%01000010
+    131  f471		       ff		      byte.b	#%11111111
+    132  f472		       ff		      byte.b	#%11111111
+    133  f473		       00		      byte.b	#%00000000
+    134  f474
+    135  f474				   P0color
+    136  f474		       00		      byte.b	#$00
+    137  f475		       00		      byte.b	#$00
+    138  f476		       00		      byte.b	#$00
+    139  f477		       00		      byte.b	#$00
+    140  f478		       00		      byte.b	#$00
+    141  f479		       00		      byte.b	#$00
+    142  f47a		       00		      byte.b	#$00
+    143  f47b		       00		      byte.b	#$00
+    144  f47c		       00		      byte.b	#$00
 ------- FILE cart.asm
-    636  f44c
-    637  f44c							;;; X and Y location per directional icon
-    638  f44c				   PositionX
-    639  f44c		       35		      byte.b	#53	; left
-    640  f44d		       6b		      byte.b	#107	; right
-    641  f44e		       50		      byte.b	#80	; up
-    642  f44f		       50		      byte.b	#80	; down
-    643  f450
-    644  f450				   PositionY
-    645  f450		       5d		      byte.b	#93	; left (177/2 - 9/2)
-    646  f451		       5d		      byte.b	#93	; right
-    647  f452		       80		      byte.b	#128	; up
-    648  f453		       3b		      byte.b	#59	; down
-    649  f454
-    650  f454							;;; digits.h should set digitTable at the beginning followed by
-    651  f454							;;;	      an array of 16 bytes for each digit 0-9
+    636  f47d
+    637  f47d							;;; X and Y location per directional icon
+    638  f47d				   PositionX
+    639  f47d		       35		      byte.b	#53	; left
+    640  f47e		       6b		      byte.b	#107	; right
+    641  f47f		       50		      byte.b	#80	; up
+    642  f480		       50		      byte.b	#80	; down
+    643  f481
+    644  f481				   PositionY
+    645  f481		       5d		      byte.b	#93	; left (177/2 - 9/2)
+    646  f482		       5d		      byte.b	#93	; right
+    647  f483		       80		      byte.b	#128	; up
+    648  f484		       3b		      byte.b	#59	; down
+    649  f485
+    650  f485							;;; digits.h should set digitTable at the beginning followed by
+    651  f485							;;;	      an array of 16 bytes for each digit 0-9
 ------- FILE digitTableRight.h LEVEL 2 PASS 2
-      0  f454					      include	"digitTableRight.h"
+      0  f485					      include	"digitTableRight.h"
       1  f500		       00 00 00 00*	      align	256
       2  f500				   digitTableRight
       3  f500							; 0

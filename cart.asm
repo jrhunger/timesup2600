@@ -5,7 +5,7 @@
 
 ;;;; start constant declarations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-P0HEIGHT equ 9
+P0HEIGHT equ 16
 ;; contants for use with game state
 ST_TIMECOUNT equ %00000001  ; counting time?
 ST_GAMEINPUT equ %00000010  ; checking player input?
@@ -131,8 +131,8 @@ Start:
     lda #55
 	sta COLUPF
 	; player/missile size register
-	lda %00000000    ; one player, single-sized
-	;lda %00000101    ; one player, double-sized
+	;lda %00000000    ; one player, single-sized
+	lda %00000101    ; one player, double-sized
 	;lda %00000111    ; one player, quad-sized
 	sta NUSIZ0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;

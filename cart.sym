@@ -55,7 +55,7 @@ CXM1P                    0001
 CXP0FB                   0002                  
 CXP1FB                   0003                  
 CXPPMM                   0007                  
-Dbitmap                  f416              (R )
+Dbitmap                  f424              (R )
 DelayTime                008c              (R )
 digitTableLeft           f600              (R )
 digitTableLeftRev        f800              (R )
@@ -104,13 +104,13 @@ NewBitmap                f084
 NoInput                  f0f0              (R )
 NoNewBitmap              f097              (R )
 NotActive                f079              (R )
-NullBitmap               f431              (R )
+NullBitmap               f454              (R )
 NUSIZ0                   0004              (R )
 NUSIZ1                   0005                  
 P0bitmap                 0087              (R )
-P0color                  f443                  
+P0color                  f474                  
 P0Correct                f0cc                  
-P0HEIGHT                 0009              (R )
+P0HEIGHT                 0010              (R )
 P0Incorrect              f0dc              (R )
 P0score                  0086              (R )
 P0spriteHi               0083              (R )
@@ -122,12 +122,12 @@ P0y                      0081              (R )
 PF0                      000d              (R )
 PF1                      000e              (R )
 PF2                      000f              (R )
-PositionX                f44c              (R )
-PositionY                f450              (R )
+PositionX                f47d              (R )
+PositionY                f481              (R )
 PosObject                f300              (R )
 Rand8                    008d              (R )
 Random                   f312              (R )
-Rbitmap                  f40d              (R )
+Rbitmap                  f414              (R )
 REFP0                    000b                  
 REFP1                    000c                  
 ReposTime                008f              (R )
@@ -168,9 +168,9 @@ TIA_BASE_WRITE_ADDRESS   0000              (R )
 TIM1T                    0294                  
 TIM64T                   0296              (R )
 TIM8T                    0295                  
-TimeBitmap               f43a              (R )
+TimeBitmap               f464              (R )
 TIMINT                   0285                  
-Ubitmap                  f41f              (R )
+Ubitmap                  f434              (R )
 VBLANK                   0001              (R )
 VDELBL                   0027                  
 VDELP0                   0025                  
@@ -179,5 +179,5 @@ VERSION_MACRO            006b
 VERSION_VCS              0069                  
 VSYNC                    0000              (R )
 WSYNC                    0002              (R )
-Xbitmap                  f428              (R )
+Xbitmap                  f444              (R )
 --- End of Symbol List.
