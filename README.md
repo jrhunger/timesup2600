@@ -19,7 +19,7 @@ Simple reaction game of finite length.
   * P1 Advanced, P1 Advanced: random in one of the 4 offset positions
 
 # Try it:
-Play here: [timesup (javatari)](https://javatari.org/?ROM=https://github.com/jrhunger/timesup2600/raw/main/cart.bin))
+Play here: [timesup (javatari)](https://javatari.org/?ROM=https://github.com/jrhunger/timesup2600/raw/main/timesup.bin))
 
 ## TODO
 * Add github actions to build and publish
