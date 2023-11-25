@@ -22,14 +22,11 @@ Simple reaction game of finite length.
 Play here: [timesup (javatari)](https://javatari.org/?ROM=https://kismographic.binaryj.net/roms/timesup.bin)
 
 ## TODO
-* Make the icons larger
 * Add github actions to build and publish
 * Add sound
   * buzz for error
   * nice sound for correct
   * neutral sound when icon pops
-* Game controls:
-  * difficulty - disable random position?
 
 ### game settings working notes
 * Position Modes: P1/P2
