@@ -7,10 +7,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 P0HEIGHT equ 16
 ;; contants for use with game state
-ST_TIMECOUNT equ %00000001  ; counting time?
-ST_GAMEINPUT equ %00000010  ; checking player input?
-ST_CHECKRST  equ %00000100  ; checking reset switch?
-ST_CHECKSLCT equ %00001000  ; checking select switch?
+ST_TIMECOUNT equ %00010000  ; counting time?
+ST_GAMEINPUT equ %00100000  ; checking player input?
+ST_CHECKRST  equ %01000000  ; checking reset switch?
+ST_CHECKSLCT equ %10000000  ; checking select switch?
+;; constants for target arrow
+SL_ARROWLT   equ %00000000  ; left arrow index
+SL_ARROWRT   equ %00000001  ; right arrow index
+SL_ARROWUP   equ %00000010  ; up arrow index
+SL_ARROWDN   equ %00000011  ; down arrow index
 ;; contants for reading console switches
 SW_RESET     equ %00000001  ; reset switch
 SW_SELECT    equ %00000010  ; select switch
@@ -25,6 +30,8 @@ SW_P1DIFF    equ %10000000  ; P1 difficulty | 1 = Advanced
 ; 11 = fixed random (in central positions uncorrelated to arrow)
 MP_FIXED     equ %00000001  ; fixed central positions
 MP_RANDOM    equ %00000010  ; fixed central positions
+; other constants
+PENALTY_CYCLES equ 45       ; 3/4 second penalty for incorrect
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; end constant declarations
 
@@ -51,6 +58,10 @@ DelayTime    byte ; (8c) Time left in delay
 Rand8        byte ; (8d) 8-bit random
 InputTime    byte ; (8e) Input re-check delay
 ReposTime    byte ; (8f) Input re-check delay
+CurrentArrow byte ; (90) Current target arrow index
+P1spritePtr  byte ; (91) y-adjusted sprite pointer
+P1spriteHi	 byte ; (92) MSB of sprite pointer
+P1bitmap     byte ; (93) Bitmap pointer for P1
 
 ; Top Bar digit pointers
     org $a0
@@ -80,15 +91,20 @@ Start:
 	ora $1       ; can't be zero
 	sta Rand8
 ;;; Set initial P0bitmap to Up
-	lda #<Ubitmap
+    lda SL_ARROWUP
+	sta CurrentArrow
+	lda #<UbitmapL
 	sta P0bitmap
-;;; player coordinates (match bitmap above)
+	lda #<UbitmapR
+	sta P1bitmap
+;;; set player colors to black
 	lda #0
+	sta COLUP0
+	sta COLUP1
+;;; player coordinates (match bitmap above)
+    ; a is already 0 from above
 	tay
 	jsr SetPosition
-;;; Set high byte of P0spritePtr (low byte updated per frame)
-	lda #>BitmapTable
-	sta P0spriteHi
 ;;; set timer to 1000 (decimal)
     lda #0
 	sta P0time0
@@ -119,7 +135,7 @@ Start:
     sta RightScorePtr0+1
 
 ;;; game state -  check input but don't consume time
-    lda ST_GAMEINPUT | ST_CHECKSLCT
+    lda #ST_GAMEINPUT | ST_CHECKSLCT
 	sta GameState
 
 ;;; game mode
@@ -131,8 +147,8 @@ Start:
     lda #55
 	sta COLUPF
 	; player/missile size register
-	;lda %00000000    ; one player, single-sized
-	lda %00000101    ; one player, double-sized
+	lda %00000000    ; one player, single-sized
+	;lda %00000101    ; one player, double-sized
 	;lda %00000111    ; one player, quad-sized
 	sta NUSIZ0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -159,7 +175,7 @@ StartFrame:
 ;;; Consume Time if applicable
 	jsr ConsumeTime
 ;;; check if open for input
-    lda ST_GAMEINPUT
+    lda #ST_GAMEINPUT
     bit GameState
 	beq NotActive   
 	jmp CheckInput
@@ -172,48 +188,51 @@ NotActive
 	sta DelayTime
 	bne NoNewBitmap
 NewBitmap
-    jsr Random     ; get a random #
-	and #%00000011 ; truncate to 2 bits
-    tay            ; put in Y
+    jsr Random       ; get a random #
+	and #%00000011   ; truncate to 2 bits
+	sta CurrentArrow ; store as current
+    tay              ; put in Y
 	clc
-	lda BitmapIndex,Y
+	lda BitmapIndexL,Y
 	sta P0bitmap
+	lda BitmapIndexR,Y
+	sta P1bitmap
 	jsr SetPosition
 SetActive:	
 	; set Active
-	lda ST_GAMEINPUT | ST_TIMECOUNT
+	lda #ST_GAMEINPUT | ST_TIMECOUNT
 	sta GameState
 NoNewBitmap
     jmp EndP0Input
 
 ;;; check input signals
 CheckInput
-    ldx #<NullBitmap
+    ldx #<NullBitmapL
 CheckP0Up:
 	lda #%00010000
 	bit SWCHA
 	bne CheckP0Down
-	ldx #<Ubitmap
+	ldx #<UbitmapL
 CheckP0Down:
 	lda #%00100000
 	bit SWCHA
 	bne CheckP0Right
-	ldx #<Dbitmap
+	ldx #<DbitmapL
 CheckP0Right:
 	lda #%10000000
 	bit SWCHA
 	bne CheckP0Left
-	ldx #<Rbitmap
+	ldx #<RbitmapL
 CheckP0Left:
 	lda #%01000000
 	bit SWCHA
 	bne EndP0InputCheck
-	ldx #<Lbitmap
+	ldx #<LbitmapL
 EndP0InputCheck:
 
 ;;; do input-related processing
 CheckInputCorrect:
-    cpx #<NullBitmap   ; if x hasn't changed
+    cpx #<NullBitmapL  ; if x hasn't changed
 	beq NoInput	       ; we didn't get input
 	lda #0             ; if we did get input
 	sta GameState      ; stop time counter and input checking
@@ -228,14 +247,21 @@ P0Correct:
 	sta P0score
 	cld
     ; set bitmap to null
-	lda #<NullBitmap
+	lda #<NullBitmapL
 	sta P0bitmap
+	lda #<NullBitmapR
+	sta P1bitmap
     jmp SetDelay
 P0Incorrect:
-	lda #<Xbitmap      ; set bitmap to X
+	lda #<XbitmapL      ; set bitmap to X
 	sta P0bitmap
-	lda ST_TIMECOUNT   ; time active, input not
+	lda #<XbitmapR      ; set bitmap to X
+	sta P1bitmap
+	lda #ST_TIMECOUNT   ; time active, input not
 	sta GameState
+	lda #PENALTY_CYCLES ; length of time lost for incorrect
+	sta DelayTime
+	jmp EndP0Input
 SetDelay:
 	; set a random delay
 	jsr Random
@@ -244,7 +270,7 @@ SetDelay:
 	sta DelayTime
 	jmp EndP0Input
 NoInput:
-    lda ST_TIMECOUNT
+    lda #ST_TIMECOUNT
 	bit GameState
 	bne EndP0Input
 	dec ReposTime
@@ -269,6 +295,13 @@ EndP0Input:
 	ldx #0
 	lda P0x
 	jsr PosObject
+;;; P1 horizontal position
+    ldx #1
+	lda P0x
+	clc
+	adc #8
+	jsr PosObject
+	sta HMOVE
 ;;; P0 vertical position
     lda P0bitmap           ; bitmap base
 	clc                    ; clear carry for add
@@ -276,9 +309,19 @@ EndP0Input:
 	sec                    ; set carry for subtract
 	sbc P0y                ; offset by P0y for draw logic
 	sta P0spritePtr        ; store in sprite pointer
-	lda #>BitmapTable      ; load 2nd byte of bitmap table
+	lda #>BitmapTableL     ; load 2nd byte of bitmap table
 	sbc #0                 ; subtract 0 (decrements if carry is clear from previous)
 	sta P0spritePtr+1     ; store in high byte of sprite pointer
+;;; P1 vertical position
+    lda P1bitmap           ; bitmap base
+	clc                    ; clear carry for add
+	adc #P0HEIGHT          ; bitmap high end
+	sec                    ; set carry for subtract
+	sbc P0y                ; offset by P0y for draw logic
+	sta P1spritePtr        ; store in sprite pointer
+	lda #>BitmapTableR     ; load 2nd byte of bitmap table
+	sbc #0                 ; subtract 0 (decrements if carry is clear from previous)
+	sta P1spritePtr+1     ; store in high byte of sprite pointer
 
 ;;; Setup score pointers for display
     jsr LoadScorePointers
@@ -326,6 +369,7 @@ EndP0Input:
 	ldx #0      ; first GRP0 should be 0
 .LoopVisible:
 ;;; for rainbow background
+    sta GRP1    ;   (calculated on previous line)
 	stx GRP0	; 3 (calculated on previous line)
 	sty COLUBK	; set bg color to loop var
 
@@ -335,14 +379,12 @@ EndP0Input:
 	sbc P0y	; 3
 	adc P0HEIGHT	; 2
 	bcs .DrawP0
-
-	nop	; 2
-	nop	; 2
-	sec	; 2
-	bcs .NoDrawP0	; 3
+	lda #0          ; A used for P1 sprite, so clear it if not drawing
+	jmp .NoDrawP0
 .DrawP0
 	lda (P0spritePtr),Y	; 5
 	tax
+	lda (P1spritePtr),Y ; 5
 .NoDrawP0
 
 	sta WSYNC	; wait for next scanline
@@ -382,7 +424,7 @@ EndP0Input:
 ;;; Load Score Pointers based on corresponding values
 
 ResetCheck SUBROUTINE
-    lda ST_CHECKRST
+    lda #ST_CHECKRST
 	bit GameState
 	beq .end
 	lda SW_RESET
@@ -399,7 +441,7 @@ ResetCheck SUBROUTINE
     rts
 
 SelectCheck SUBROUTINE
-    lda ST_CHECKSLCT
+    lda #ST_CHECKSLCT
 	bit GameState
 	beq .end
 	lda InputTime
@@ -458,12 +500,12 @@ ModeCheck SUBROUTINE
 ;; SetPosition expects the arrow bitmap index (0-3) in Y
 SetPosition SUBROUTINE	
 	; Update position
-    lda MP_FIXED | MP_RANDOM
+    lda #MP_FIXED | MP_RANDOM
 	and GameMode
 	beq .center
 	cmp MP_FIXED | MP_RANDOM
 	beq .fixedrandom
-	lda MP_RANDOM
+	lda #MP_RANDOM
 	bit GameMode
 	bne .random
 .fixed:
@@ -499,7 +541,7 @@ SetPosition SUBROUTINE
     rts
 
 ConsumeTime SUBROUTINE
-    lda ST_TIMECOUNT  ; check if TIMECOUNT bit
+    lda #ST_TIMECOUNT  ; check if TIMECOUNT bit
     bit GameState     ; is set in GameState
 	bne .usetime
 	rts
@@ -520,10 +562,12 @@ ConsumeTime SUBROUTINE
 	lda #0
 	sta P0time0
 	sta P0time1
-	lda ST_CHECKRST | ST_CHECKSLCT
+	lda #ST_CHECKRST | ST_CHECKSLCT
 	sta GameState
-	lda #<TimeBitmap
+	lda #<TimeBitmapL
 	sta P0bitmap
+	lda #<TimeBitmapR
+	sta P1bitmap
 	lda PositionX+2
 	sta P0x
 	lda PositionY
@@ -632,7 +676,8 @@ Random SUBROUTINE
 
 ;;;;  start ROM lookup tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    include "bitmaps.h"
+    include "bitmapsL.h"
+    include "bitmapsR.h"
 
 ;;; X and Y location per directional icon
 PositionX:
