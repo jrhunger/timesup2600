@@ -88,10 +88,10 @@ Start:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; initialize Random seed
     lda INTIM    ; unknown from timer
-	ora $1       ; can't be zero
+	ora #$1       ; can't be zero
 	sta Rand8
 ;;; Set initial P0bitmap to Up
-    lda SL_ARROWUP
+    lda #SL_ARROWUP
 	sta CurrentArrow
 	lda #<UbitmapL
 	sta P0bitmap
@@ -147,9 +147,9 @@ Start:
     lda #55
 	sta COLUPF
 	; player/missile size register
-	lda %00000000    ; one player, single-sized
-	;lda %00000101    ; one player, double-sized
-	;lda %00000111    ; one player, quad-sized
+	lda #%00000000    ; one player, single-sized
+	;lda #%00000101    ; one player, double-sized
+	;lda #%00000111    ; one player, quad-sized
 	sta NUSIZ0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;  end variable initialization
@@ -301,7 +301,10 @@ EndP0Input:
 	clc
 	adc #8
 	jsr PosObject
-	sta HMOVE
+	; see https://forums.atariage.com/topic/162520-fine-positioning-not-working/?do=findComment&comment=2006722
+	; if HMOVE is strobed too late in the line it doesn't move the player enough, so WSYNC first
+	sta WSYNC
+ 	sta HMOVE
 ;;; P0 vertical position
     lda P0bitmap           ; bitmap base
 	clc                    ; clear carry for add
@@ -311,7 +314,7 @@ EndP0Input:
 	sta P0spritePtr        ; store in sprite pointer
 	lda #>BitmapTableL     ; load 2nd byte of bitmap table
 	sbc #0                 ; subtract 0 (decrements if carry is clear from previous)
-	sta P0spritePtr+1     ; store in high byte of sprite pointer
+	sta P0spriteHi        ; store in high byte of sprite pointer
 ;;; P1 vertical position
     lda P1bitmap           ; bitmap base
 	clc                    ; clear carry for add
@@ -321,7 +324,7 @@ EndP0Input:
 	sta P1spritePtr        ; store in sprite pointer
 	lda #>BitmapTableR     ; load 2nd byte of bitmap table
 	sbc #0                 ; subtract 0 (decrements if carry is clear from previous)
-	sta P1spritePtr+1     ; store in high byte of sprite pointer
+	sta P1spriteHi         ; store in high byte of sprite pointer
 
 ;;; Setup score pointers for display
     jsr LoadScorePointers
@@ -367,17 +370,19 @@ EndP0Input:
 	sta WSYNC
 	ldy #177	; counter
 	ldx #0      ; first GRP0 should be 0
+	lda #0      ; first GRP1 should be 0
 .LoopVisible:
+;;; player bitmaps calculated on previous line
+    sta GRP1    ; 
+	stx GRP0	; 3
 ;;; for rainbow background
-    sta GRP1    ;   (calculated on previous line)
-	stx GRP0	; 3 (calculated on previous line)
 	sty COLUBK	; set bg color to loop var
 
 ;;; draw P0
 	sec	; 2 set carry
 	tya	; 2
 	sbc P0y	; 3
-	adc P0HEIGHT	; 2
+	adc #P0HEIGHT	; 2
 	bcs .DrawP0
 	lda #0          ; A used for P1 sprite, so clear it if not drawing
 	jmp .NoDrawP0
@@ -386,7 +391,6 @@ EndP0Input:
 	tax
 	lda (P1spritePtr),Y ; 5
 .NoDrawP0
-
 	sta WSYNC	; wait for next scanline
 	dey	; y--
 	bne .LoopVisible	; go back until x = 0
@@ -427,7 +431,7 @@ ResetCheck SUBROUTINE
     lda #ST_CHECKRST
 	bit GameState
 	beq .end
-	lda SW_RESET
+	lda #SW_RESET
 	bit SWCHB
 	beq .reset
 	lda #%10000000     ; only bit 7 used
@@ -449,7 +453,7 @@ SelectCheck SUBROUTINE
 	dec InputTime
 	jmp .end
 .checkselect
-	lda SW_SELECT
+	lda #SW_SELECT
 	bit SWCHB
 	bne .end
 	; actual SELECT behavior
@@ -503,7 +507,7 @@ SetPosition SUBROUTINE
     lda #MP_FIXED | MP_RANDOM
 	and GameMode
 	beq .center
-	cmp MP_FIXED | MP_RANDOM
+	cmp #MP_FIXED | MP_RANDOM
 	beq .fixedrandom
 	lda #MP_RANDOM
 	bit GameMode
